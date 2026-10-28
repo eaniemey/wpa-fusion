@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Unit tests plus SDK engine tests that load the plugins headless. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Performance.Toolkit.Engine" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\WpaFusion.Common\WpaFusion.Common.csproj" />
+    <ProjectReference Include="..\..\src\WpaFusion.Tbrw\WpaFusion.Tbrw.csproj" />
+    <ProjectReference Include="..\..\src\WpaFusion.Tma\WpaFusion.Tma.csproj" />
+    <ProjectReference Include="..\..\src\WpaFusion.Plugin.Typeperf\WpaFusion.Plugin.Typeperf.csproj" />
+    <ProjectReference Include="..\..\src\WpaFusion.Plugin.Sep\WpaFusion.Plugin.Sep.csproj" />
+    <ProjectReference Include="..\..\src\WpaFusion.Capture\WpaFusion.Capture.csproj" />
+  </ItemGroup>
+</Project>

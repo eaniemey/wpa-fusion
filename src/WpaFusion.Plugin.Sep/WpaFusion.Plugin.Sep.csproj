@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- WPA plugin: .tb7 data source, sample table, top-down (TMA) tables. -->
+  <ItemGroup>
+    <!-- WPA supplies the SDK at runtime; do not ship a second copy next to the plugin. -->
+    <PackageReference Include="Microsoft.Performance.SDK" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\WpaFusion.Common\WpaFusion.Common.csproj" />
+    <ProjectReference Include="..\WpaFusion.Tbrw\WpaFusion.Tbrw.csproj" />
+    <ProjectReference Include="..\WpaFusion.Tma\WpaFusion.Tma.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="WpaFusion.Tests" />
+  </ItemGroup>
+</Project>

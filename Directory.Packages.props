@@ -1,0 +1,19 @@
+<Project>
+  <!-- Central package versions. The SDK pin must match the SDK bundled with the target WPA. -->
+  <ItemGroup>
+    <!-- WPA 11.7.383 bundles Microsoft.Performance.SDK 1.2.2-preview. -->
+    <PackageVersion Include="Microsoft.Performance.SDK" Version="1.2.2-preview" />
+    <PackageVersion Include="Microsoft.Performance.Toolkit.Engine" Version="1.2.2-preview" />
+
+    <!-- TraceProcessor reads the ETL back after capture to find WPA's time zero (capture tool only). -->
+    <PackageVersion Include="Microsoft.Windows.EventTracing.Events" Version="1.12.10" />
+    <PackageVersion Include="Microsoft.Windows.EventTracing.Metadata" Version="1.12.10" />
+    <!-- Offline attribution only; never load TraceProcessing into the WPA plugin. -->
+    <PackageVersion Include="Microsoft.Windows.EventTracing.Processing.All" Version="1.12.10" />
+
+    <!-- Test stack; these versions still support net6.0. -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageVersion Include="xunit" Version="2.9.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+</Project>

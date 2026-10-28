@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.sln text eol=crlf
+*.ps1 text eol=crlf
+# typeperf -cf input; kept byte-identical to the source package.
+src/WpaFusion.Capture/Counters/typeperfinput.txt text eol=crlf
+*.tb7 binary
+*.etl binary

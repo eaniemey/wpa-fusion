@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- SEP EDP metric loading and TMA metric evaluation. No WPA dependency. -->
+  <ItemGroup>
+    <ProjectReference Include="..\WpaFusion.Common\WpaFusion.Common.csproj" />
+  </ItemGroup>
+</Project>

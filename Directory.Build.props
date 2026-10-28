@@ -1,0 +1,18 @@
+<Project>
+  <!-- Shared settings for every WPA-Fusion project. -->
+  <PropertyGroup>
+    <!-- WPA 11.7 hosts plugins on its bundled .NET 6.0.27 runtime. -->
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- TBRW and SEP are x64-only native libraries. -->
+    <PlatformTarget>x64</PlatformTarget>
+    <Deterministic>true</Deterministic>
+    <!-- net6.0 is out of support but required by WPA; silence the EOL warning. -->
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <!-- No empty catch blocks, nullable warnings are errors. -->
+    <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

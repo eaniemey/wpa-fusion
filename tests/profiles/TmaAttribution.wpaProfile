@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WpaProfileContainer xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Version="2" xmlns="http://tempuri.org/SerializableElement.xsd">
+  <Content xsi:type="WpaProfile2">
+    <Sessions />
+    <Views>
+      <View Title="Attributed TMA" Guid="f06383d0-f477-4557-9afe-249232b4c665" IsVisible="true">
+        <Graphs>
+          <Graph Guid="d4b8f2c6-1a2b-4e1a-9c3d-5e6f7a8b9c03" LayoutStyle="GraphAndTable" Color="#FF8764B8" GraphHeight="200" IsShown="true">
+            <Preset Name="Attributed Function Timeline" GraphColumnCount="15" KeyColumnCount="7" LeftFrozenColumnCount="0" RightFrozenColumnCount="1" InitialFilterQuery="[Attribution Scope]:=&quot;Function&quot; AND [Window]:=&quot;Slice&quot; AND [Depth]:=1" InitialFilterShouldKeep="true" InitialExpansionQuery="[Series Depth]:&lt;=5" GraphFilterColumnGuid="00000000-0000-0000-0000-000000000000">
+              <MetadataEntries>
+                <MetadataEntry Guid="d4b8f2c6-0026-4e1a-9c3d-5e6f7a8b9c03" Name="Slice Start" ColumnMetadata="StartTime" />
+                <MetadataEntry Guid="d4b8f2c6-0027-4e1a-9c3d-5e6f7a8b9c03" Name="Slice Duration" ColumnMetadata="Duration" />
+              </MetadataEntries>
+              <HighlightEntries />
+              <Columns>
+                <Column Guid="d4b8f2c6-0021-4e1a-9c3d-5e6f7a8b9c03" Name="Process" Width="200" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0028-4e1a-9c3d-5e6f7a8b9c03" Name="Process Instance" Width="140" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0022-4e1a-9c3d-5e6f7a8b9c03" Name="Module" Width="280" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0023-4e1a-9c3d-5e6f7a8b9c03" Name="Function" Width="240" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0005-4e1a-9c3d-5e6f7a8b9c03" Name="Metric" Width="180" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0020-4e1a-9c3d-5e6f7a8b9c03" Name="Attribution Scope" Width="100" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0024-4e1a-9c3d-5e6f7a8b9c03" Name="Window" Width="80" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0006-4e1a-9c3d-5e6f7a8b9c03" Name="Depth" Width="50" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0007-4e1a-9c3d-5e6f7a8b9c03" Name="Status" Width="280" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0025-4e1a-9c3d-5e6f7a8b9c03" Name="Supporting Samples" AggregationMode="Max" Width="100" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0026-4e1a-9c3d-5e6f7a8b9c03" Name="Slice Start" AggregationMode="Min" Width="100" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0027-4e1a-9c3d-5e6f7a8b9c03" Name="Slice Duration" AggregationMode="Max" Width="100" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0009-4e1a-9c3d-5e6f7a8b9c03" Name="% of Slots" AggregationMode="Max" Width="100" IsVisible="true" />
+              </Columns>
+            </Preset>
+          </Graph>
+        </Graphs>
+        <SessionIndices><SessionIndex>0</SessionIndex></SessionIndices>
+      </View>
+    </Views>
+    <ModifiedGraphs />
+  </Content>
+</WpaProfileContainer>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WpaProfileContainer xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Version="2" xmlns="http://tempuri.org/SerializableElement.xsd">
+  <Content xsi:type="WpaProfile2">
+    <Sessions />
+    <Views>
+      <View Title="Typeperf Counters" Guid="5b0f3a7e-2c41-4d8a-9e6b-7a1c2d3e4f50" IsVisible="true">
+        <Graphs>
+          <Graph Guid="8e1f4b2c-6a3d-4c5e-b7f8-1d2e3f4a5b60" LayoutStyle="GraphAndTable" Color="#FFD83B01" GraphHeight="200" IsShown="true">
+            <Preset Name="Typeperf Counters Over Time" GraphColumnCount="11" KeyColumnCount="5" LeftFrozenColumnCount="0" RightFrozenColumnCount="1" InitialFilterShouldKeep="true" InitialExpansionQuery="[Series Depth]:&lt;=3" GraphFilterColumnGuid="00000000-0000-0000-0000-000000000000">
+              <MetadataEntries>
+                <MetadataEntry Guid="8e1f4b2c-0006-4c5e-b7f8-1d2e3f4a5b60" Name="Time" ColumnMetadata="StartTime" />
+                <MetadataEntry Guid="8e1f4b2c-0009-4c5e-b7f8-1d2e3f4a5b60" Name="Duration" ColumnMetadata="Duration" />
+              </MetadataEntries>
+              <HighlightEntries />
+              <Columns>
+                <Column Guid="8e1f4b2c-0002-4c5e-b7f8-1d2e3f4a5b60" Name="Object" Width="160" IsVisible="true" />
+                <Column Guid="8e1f4b2c-0003-4c5e-b7f8-1d2e3f4a5b60" Name="Counter" Width="220" IsVisible="true" />
+                <Column Guid="8e1f4b2c-0004-4c5e-b7f8-1d2e3f4a5b60" Name="Instance" Width="140" IsVisible="true" />
+                <Column Guid="8e1f4b2c-0001-4c5e-b7f8-1d2e3f4a5b60" Name="Machine" Width="120" IsVisible="true" />
+                <Column Guid="8e1f4b2c-0005-4c5e-b7f8-1d2e3f4a5b60" Name="Counter Path" Width="300" IsVisible="true" />
+                <Column Guid="8e1f4b2c-0008-4c5e-b7f8-1d2e3f4a5b60" Name="Count" AggregationMode="Sum" Width="70" IsVisible="true" />
+                <Column Guid="8e1f4b2c-0006-4c5e-b7f8-1d2e3f4a5b60" Name="Time" AggregationMode="Min" Width="120" IsVisible="true" />
+                <Column Guid="8e1f4b2c-0009-4c5e-b7f8-1d2e3f4a5b60" Name="Duration" AggregationMode="Max" Width="100" IsVisible="true" />
+                <Column Guid="8e1f4b2c-0007-4c5e-b7f8-1d2e3f4a5b60" Name="Value" AggregationMode="Average" Width="120" IsVisible="true" />
+              </Columns>
+            </Preset>
+          </Graph>
+        </Graphs>
+        <SessionIndices><SessionIndex>0</SessionIndex></SessionIndices>
+      </View>
+    </Views>
+    <ModifiedGraphs />
+  </Content>
+</WpaProfileContainer>

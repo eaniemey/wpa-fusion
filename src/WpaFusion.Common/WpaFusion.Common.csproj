@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared types, clock map (TSC to QPC to wall clock), session.json reader. No dependencies. -->
+</Project>

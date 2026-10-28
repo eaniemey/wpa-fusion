@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WpaProfileContainer xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Version="2" xmlns="http://tempuri.org/SerializableElement.xsd">
+  <Content xsi:type="WpaProfile2">
+    <Sessions />
+    <Views>
+      <View Title="WPA-Fusion Alignment Check" Guid="7d2c4f1a-8e3b-4a6d-9c05-1b2e3f4a5c6d" IsVisible="true">
+        <Graphs>
+          <Graph Guid="04f69f98-176e-4d1c-b44e-97f734996ab8" LayoutStyle="Table" Color="#FF0078D7" GraphHeight="125" IsShown="true">
+            <Preset Name="WPA-Fusion Markers In ETL" BarGraphIntervalCount="50" GraphColumnCount="3" KeyColumnCount="0" LeftFrozenColumnCount="0" RightFrozenColumnCount="2" InitialFilterQuery="[Provider Name]:=&quot;WPA-Fusion-Capture&quot; OR [Provider Name]:=&quot;PerfScope-Capture&quot;" InitialFilterShouldKeep="true" GraphFilterColumnGuid="00000000-0000-0000-0000-000000000000">
+              <MetadataEntries />
+              <HighlightEntries />
+              <Columns>
+                <Column Guid="8b4c40f8-0d99-437d-86ab-56ec200137dc" Name="Provider Name" SortPriority="2" Width="200" IsVisible="true" />
+                <Column Guid="511777f7-30ef-4e86-bd0b-0facaf23a0d3" Name="Task Name" SortPriority="3" Width="120" IsVisible="true" />
+                <Column Guid="bbfc990a-b6c9-4dcd-858b-f040ab4a1efe" Name="Time" SortOrder="Ascending" SortPriority="1" TextAlignment="Right" Width="140" CellFormat="sN9" IsVisible="true" />
+              </Columns>
+            </Preset>
+          </Graph>
+          <Graph Guid="3f6a2d10-9b4c-4e7d-a1f2-5c8e9b0d7a61" LayoutStyle="Table" Color="#FF107C10" GraphHeight="125" IsShown="true">
+            <Preset Name="WPA-Fusion Sync Markers" BarGraphIntervalCount="50" GraphColumnCount="5" KeyColumnCount="0" LeftFrozenColumnCount="0" RightFrozenColumnCount="4" InitialFilterQuery="" GraphFilterColumnGuid="00000000-0000-0000-0000-000000000000">
+              <MetadataEntries />
+              <HighlightEntries />
+              <Columns>
+                <Column Guid="3f6a2d10-0001-4e7d-a1f2-5c8e9b0d7a61" Name="Marker" SortPriority="2" Width="100" IsVisible="true" />
+                <Column Guid="3f6a2d10-0004-4e7d-a1f2-5c8e9b0d7a61" Name="ETW Lag (us)" SortPriority="3" Width="100" IsVisible="true" />
+                <Column Guid="3f6a2d10-0005-4e7d-a1f2-5c8e9b0d7a61" Name="TSC-QPC Residual (ns)" SortPriority="4" Width="100" IsVisible="true" />
+                <Column Guid="3f6a2d10-0003-4e7d-a1f2-5c8e9b0d7a61" Name="QPC Read Time" SortPriority="5" Width="140" CellFormat="sN9" IsVisible="true" />
+                <Column Guid="3f6a2d10-0002-4e7d-a1f2-5c8e9b0d7a61" Name="Time" SortOrder="Ascending" SortPriority="1" Width="140" CellFormat="sN9" IsVisible="true" />
+              </Columns>
+            </Preset>
+          </Graph>
+          <Graph Guid="8e1f4b2c-6a3d-4c5e-b7f8-1d2e3f4a5b60" LayoutStyle="Table" Color="#FFD83B01" GraphHeight="125" IsShown="true">
+            <Preset Name="WPA-Fusion Typeperf Available MBytes" BarGraphIntervalCount="50" GraphColumnCount="3" KeyColumnCount="0" LeftFrozenColumnCount="0" RightFrozenColumnCount="2" InitialFilterQuery="[Counter]:=&quot;Available MBytes&quot;" InitialFilterShouldKeep="true" GraphFilterColumnGuid="00000000-0000-0000-0000-000000000000">
+              <MetadataEntries />
+              <HighlightEntries />
+              <Columns>
+                <Column Guid="8e1f4b2c-0003-4c5e-b7f8-1d2e3f4a5b60" Name="Counter" SortPriority="4" Width="200" IsVisible="true" />
+                <Column Guid="8e1f4b2c-0005-4c5e-b7f8-1d2e3f4a5b60" Name="Counter Path" SortPriority="2" Width="300" IsVisible="true" />
+                <Column Guid="8e1f4b2c-0007-4c5e-b7f8-1d2e3f4a5b60" Name="Value" SortPriority="3" Width="100" IsVisible="true" />
+                <Column Guid="8e1f4b2c-0006-4c5e-b7f8-1d2e3f4a5b60" Name="Time" SortOrder="Ascending" SortPriority="1" Width="140" CellFormat="sN9" IsVisible="true" />
+              </Columns>
+            </Preset>
+          </Graph>
+          <Graph Guid="d4b8f2c6-1a2b-4e1a-9c3d-5e6f7a8b9c01" LayoutStyle="Table" Color="#FF8764B8" GraphHeight="125" IsShown="true">
+            <Preset Name="WPA-Fusion TMA Summary" BarGraphIntervalCount="50" GraphColumnCount="6" KeyColumnCount="0" LeftFrozenColumnCount="0" RightFrozenColumnCount="5" InitialFilterQuery="" GraphFilterColumnGuid="00000000-0000-0000-0000-000000000000">
+              <MetadataEntries />
+              <HighlightEntries />
+              <Columns>
+                <Column Guid="d4b8f2c6-0005-4e1a-9c3d-5e6f7a8b9c01" Name="Metric" SortPriority="2" Width="200" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0006-4e1a-9c3d-5e6f7a8b9c01" Name="Depth" SortPriority="3" Width="50" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0001-4e1a-9c3d-5e6f7a8b9c01" Name="Level 1" SortPriority="4" Width="150" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0002-4e1a-9c3d-5e6f7a8b9c01" Name="Level 2" SortPriority="5" Width="150" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0007-4e1a-9c3d-5e6f7a8b9c01" Name="Status" SortPriority="6" Width="250" IsVisible="true" />
+                <Column Guid="d4b8f2c6-0009-4e1a-9c3d-5e6f7a8b9c01" Name="% of Slots" SortPriority="1" Width="100" IsVisible="true" />
+              </Columns>
+            </Preset>
+          </Graph>
+          <Graph Guid="c2a7e1b4-3d5f-4a60-8b9c-0e1f2a3b4c5d" LayoutStyle="Table" Color="#FF00B7C3" GraphHeight="125" IsShown="true">
+            <Preset Name="WPA-Fusion SEP Samples" BarGraphIntervalCount="50" GraphColumnCount="5" KeyColumnCount="0" LeftFrozenColumnCount="0" RightFrozenColumnCount="4" InitialFilterQuery="" GraphFilterColumnGuid="00000000-0000-0000-0000-000000000000">
+              <MetadataEntries />
+              <HighlightEntries />
+              <Columns>
+                <Column Guid="c2a7e1b4-0001-4a60-8b9c-0e1f2a3b4c5d" Name="Event" SortPriority="2" Width="250" IsVisible="true" />
+                <Column Guid="c2a7e1b4-0002-4a60-8b9c-0e1f2a3b4c5d" Name="Process" SortPriority="3" Width="200" IsVisible="true" />
+                <Column Guid="c2a7e1b4-0007-4a60-8b9c-0e1f2a3b4c5d" Name="CPU" SortPriority="4" Width="50" IsVisible="true" />
+                <Column Guid="c2a7e1b4-000a-4a60-8b9c-0e1f2a3b4c5d" Name="Event Count" SortPriority="5" Width="100" IsVisible="true" />
+                <Column Guid="c2a7e1b4-0009-4a60-8b9c-0e1f2a3b4c5d" Name="Time" SortOrder="Ascending" SortPriority="1" Width="140" CellFormat="sN9" IsVisible="true" />
+              </Columns>
+            </Preset>
+          </Graph>
+        </Graphs>
+        <SessionIndices>
+          <SessionIndex>0</SessionIndex>
+        </SessionIndices>
+      </View>
+    </Views>
+    <ModifiedGraphs />
+  </Content>
+</WpaProfileContainer>

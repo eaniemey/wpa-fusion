@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>wpafusion-attribute</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\WpaFusion.Plugin.Sep\WpaFusion.Plugin.Sep.csproj" />
+    <PackageReference Include="Microsoft.Performance.SDK" />
+    <PackageReference Include="Microsoft.Windows.EventTracing.Processing.All" />
+  </ItemGroup>
+</Project>

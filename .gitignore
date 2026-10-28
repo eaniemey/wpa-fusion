@@ -1,0 +1,19 @@
+# Build output
+bin/
+obj/
+artifacts/
+TestResults/
+*.user
+.vs/
+
+# Run artifacts: every capture run writes to output/<yyyyMMdd-HHmmss>/.
+output/
+
+# Stray captures outside output/. Small test fixtures (.tb7, .csv) are committed.
+*.etl
+*.etl.NGENPDB/
+*.NGENPDB/
+fixtures/**/*.tb7.bak
+
+# Spike code is throwaway.
+spike/

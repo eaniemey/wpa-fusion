@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- WPA plugin: Typeperf (CSV) data source, counter table, graph presets. -->
+  <ItemGroup>
+    <!-- WPA supplies the SDK at runtime; do not ship a second copy next to the plugin. -->
+    <PackageReference Include="Microsoft.Performance.SDK" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\WpaFusion.Common\WpaFusion.Common.csproj" />
+  </ItemGroup>
+</Project>
