@@ -17,11 +17,11 @@ is not a general-purpose profiler or a hardened production tool.
 - `wpafusion-capture` starts Windows Performance Recorder (WPR), Typeperf, and
   SEP; detects the collection platform with `sep -version`; records clock
   synchronization points; and saves the run's files and `session.json` together.
-- The WPA SEP plugin reads the bound `.tb7` file and displays event samples,
-  optional Last Branch Record (LBR) stacks, and sampled TMA metrics.
 - `wpafusion-attribute` resolves sample addresses against the matching ETL
   outside WPA and writes validated sidecars for module/function names and
   stacks.
+- The WPA SEP plugin reads the bound `.tb7` file and displays event samples,
+  optional Last Branch Record (LBR) stacks, and sampled TMA metrics.
 - Every plugin data source uses the clock mapping in `session.json` to align
   with the ETL timeline.
 
