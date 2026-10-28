@@ -47,8 +47,7 @@ development machine, see [docs/DEVELOPER.MD](docs/DEVELOPER.MD).
   administrator access for capture. Current validation is on Intel hardware.
 - Windows Performance Toolkit (WPA and WPR) and Windows `typeperf`.
 - Intel SEP installed separately, including its sampling driver. SEP binaries
-  and drivers are not included. The pinned development configuration is SEP
-  5.52 with TBRW 3.52; other versions require validation.
+  and drivers are not included. SEP 5.52 with TBRW 3.52 (or newer) required; other versions require validation.
 - For building from source, the .NET 10 SDK and the .NET 6 runtime for tests.
   See [developer setup](docs/DEVELOPER.MD).
 
