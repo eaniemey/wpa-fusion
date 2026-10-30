@@ -327,7 +327,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\package-collector.ps
 The script writes paired Capture and Attribute ZIPs and publish directories
 under `artifacts\packages\` and prints each ZIP's SHA-256. These packages do
 not include SEP or its driver, WPR, WPA, or the WPA plugin. The Attribute
-package requires local SEP/TBRW and MPP for batch fusion. Processed metrics are
+package requires local SEP/TBRW and MPP for EMON processing/batch fusion. The
+capture ZIP includes `wpafusion-attribute.exe` beside the collector; keep both
+for default automatic processing, or use `--skip-attribute` for collection only.
+Processed metrics are
 CSV values, with the selected XML snapshot supplying hierarchy metadata.
 Each package includes a `README.txt` with
 target-machine prerequisites and usage.

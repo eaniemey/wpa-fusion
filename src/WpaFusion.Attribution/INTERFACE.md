@@ -10,6 +10,10 @@ runs outside WPA; the SEP plugin reads only the resulting data sidecar.
 
 `wpafusion-attribute <run-directory> [symbol-path] [--stacks etw|lbr|both]`
 
+Capture invokes this automatically by default; `--skip-attribute` opts out.
+The input can be a native SEP+ETL run, native EMON run, or completed two-pass
+batch. Manual invocation remains useful for retries and custom symbol paths.
+
 Requires SEP/TBRW, Windows Performance Toolkit, and a run containing `session.json`,
 a bound `.tb7`, and its concurrent ETL with process/image metadata (the default
 WpaFusionPrecise profile suffices; ETW CPU sampling is needed only for the ETW-join pass).
@@ -52,8 +56,9 @@ $processed = 'C:\captures\processed-output' # Use the tool's Output path.
 .\scripts\open-run.ps1 -Run $processed -NoAttribute
 ```
 
-Passing a standalone EMON folder is not the SEP attribution command: process
-it with `scripts/process-emon.ps1`. The fused launcher loads only the reference
+Passing a standalone native EMON folder now processes it with Intel MPP into a
+new `output/<yyyyMMdd-HHmmss-fff>-emon` folder. `scripts/process-emon.ps1` remains
+an alternative for explicit MPP/time-zone overrides. The fused launcher loads only the reference
 SEP ETL natively, its attributed `.tb7`, and the aligned EMON descriptor.
 
 ## Sidecar

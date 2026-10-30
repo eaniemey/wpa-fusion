@@ -5,6 +5,9 @@ Internal experimental Intel tool; do not distribute outside Intel. This is a
 separate, single-file, self-contained analysis executable paired by release
 timestamp with the WPA-Fusion collector.
 It does not include WPA or the WPA-Fusion plugin.
+The capture package includes this executable beside wpafusion-capture.exe and
+runs it automatically after successful collection. Use capture's --skip-attribute
+to collect raw data without that step; manual commands below also support retries.
 
 Prerequisites
 -------------
@@ -30,6 +33,10 @@ auto-detected location, set its root first:
 Generate a new attributed run without modifying the source capture:
 
   .\wpafusion-attribute.exe C:\captures\run C:\approved-symbols --stacks lbr
+
+Standalone EMON input is also accepted and processed through Intel MPP:
+
+  .\wpafusion-attribute.exe C:\captures\emon-run
 
 For an opt-in capture batch (wpafusion-capture --runs 2), pass its parent folder
 instead. Intel MPP must be available on PATH or through WPA_FUSION_MPP_EXE.

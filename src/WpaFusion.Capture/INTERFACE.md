@@ -16,6 +16,20 @@ Console app `wpafusion-capture`. Starts WPR, typeperf and `SEP_ROOT/bin64/sep.ex
 
 ## Command line
 
+Post-capture attribution is enabled by default. After successful collection,
+the top-level command invokes `wpafusion-attribute` on the raw run, or once on
+the completed batch. Native EMON folders use that executable's MPP processing
+path. `--skip-attribute` leaves only raw files for remote/manual processing.
+Internal batch passes never launch attribution separately.
+
+The companion is resolved from `WPA_FUSION_ATTRIBUTE_EXE`, beside capture, the
+newest source-tree Debug/Release build, or PATH. `Raw capture:` identifies the
+preserved inputs; the final `Output:`/`Processed dataset:` identifies processed
+data. Processing failure returns a nonzero exit code and writes
+`ATTRIBUTION-FAILED.txt`/available `post-capture.log` without adding
+`CAPTURE-FAILED.txt` to a successful raw run. SEP without ETW requires the skip
+override; captures without PMU data have no attribution step.
+
 `--emon` replaces SEP collection with `emon -collect-edp`, retaining WPR and
 Typeperf. It records `emon.dat`, `emon.log`, and `captureTimeZoneId` in the run.
 SEP and EMON are mutually exclusive; SEP pause/delay flags are rejected in
@@ -94,6 +108,8 @@ processing, see [the developer workflow](../../docs/DEVELOPER.MD).
 Run `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\package-collector.ps1`
 from the repository. It publishes an untrimmed, self-contained Release `win-x64`
 folder and ZIP under `artifacts\packages`, with a timestamped name and SHA256
-printed to the console. No installed .NET runtime is needed on the target.
+printed to the console. The capture ZIP includes `wpafusion-attribute.exe`
+beside the collector for the new default. Keep both together or use
+`--skip-attribute` for collection-only deployment. No installed .NET runtime is needed on the target.
 Intel SEP (including its driver), WPR and typeperf remain external prerequisites.
 See `PACKAGE-README.txt` for target-system setup, capture and result-transfer steps.

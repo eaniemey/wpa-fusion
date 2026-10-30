@@ -17,6 +17,7 @@ WPA plugin that adds SEP samples/stacks and EMON/MPP TMA data to Windows Perform
 7. Plugin projects only map data to WPA tables. Logic lives in testable classes.
 8. Cross-run fusion is opt-in (`--runs 2`), never default: one concurrent SEP+ETL execution, then standalone EMON. Attribute SEP against its own native ETL before display alignment; preserve raw IDs and label source runs. Match workload-start markers with an offset only, never infer cross-run causality or process-attributed EMON values.
 9. SEP and EMON own explicit disjoint table sets (four sample/stack and two global metric tables). Shared namespace discovery caused a WPA registration failure; a no-data response does not unregister a table. TMA views preserve hierarchy/order; flat EDP metrics are separate. Average Value excludes missing/non-finite samples; MPP Aggregate remains independent.
+10. Capture invokes wpafusion-attribute by default only after complete collection (once per completed batch). --skip-attribute opts out. Native EMON folders are accepted by the companion and processed with Intel MPP. Preserve raw capture and report ATTRIBUTION-FAILED.txt for post-processing failures, not CAPTURE-FAILED.txt. Capture ZIPs ship both executables; custom symbols use the explicit manual workflow.
 
 ## Project map
 

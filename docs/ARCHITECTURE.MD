@@ -24,7 +24,7 @@ wpafusion-capture
   clocks    -> session.json (TSC/QPC/UTC sync points and ETL time origin)
   platform  -> session.json (SEP platform, PMU, and CPU name)
 
-wpafusion-attribute (offline, optional)
+wpafusion-attribute (automatic after capture unless --skip-attribute; manual retry supported)
   trace.etl + sep.tb7 + optional local symbols
     -> sep.tb7.attribution.json
     -> sep.tb7.lbrstacks.json (when LBR data is present)
@@ -32,6 +32,7 @@ wpafusion-attribute (offline, optional)
 
 scripts/process-emon.ps1 (offline, EMON runs only)
   emon.dat -> Intel MPP -> system-view details/summary CSVs + metrics.emon.json
+  (manual alternative; capture's default companion accepts native EMON input directly)
 
 wpafusion-capture --runs 2 (explicit opt-in)
   pass 1: workload + SEP + its concurrent ETL
@@ -41,6 +42,7 @@ wpafusion-capture --runs 2 (explicit opt-in)
 wpafusion-attribute <batch folder>
   native SEP/ETL attribution + Intel MPP processing
   -> new fused folder: fusion.json + copied source runs + marker alignment metadata
+  (invoked once after both captures by default, never between passes)
 
 WPA
   trace.etl -> native ETW tables
@@ -54,6 +56,10 @@ The manifest refers to files relative to that folder. Attribution creates a
 new output run and copies the inputs rather than modifying the original. The
 plugin opens the bound `.tb7` read-only and validates sidecars against the
 `.tb7` hash and expected sample count.
+Capture's final output is processed by default. `--skip-attribute` retains only
+raw output. Companion resolution uses `WPA_FUSION_ATTRIBUTE_EXE`, a sibling
+executable, the newest source build, or PATH. Post-capture failure preserves the
+raw dataset and writes `ATTRIBUTION-FAILED.txt`, not a capture-failure marker.
 
 ## Clock alignment
 
@@ -254,7 +260,8 @@ still required to align the resulting value to ETW.
 
 ### 3. Resolve SEP samples offline
 
-Run the attribution tool against a completed capture before opening it in WPA:
+Capture normally performs this step automatically. For a raw run collected
+with `--skip-attribute`, a retry, or custom symbols, run attribution manually:
 
 ```powershell
 .\src\WpaFusion.Attribution\bin\Debug\net6.0\wpafusion-attribute.exe `
@@ -305,7 +312,7 @@ counter data needed for these views.
 
 ```powershell
 .\src\WpaFusion.Capture\bin\Debug\net10.0\wpafusion-capture.exe `
-  --runs 2 --sep-start-paused --sep-resume-after 30 --sep-duration 5 `
+  --skip-attribute --runs 2 --sep-start-paused --sep-resume-after 30 --sep-duration 5 `
   --output .\output -- C:\Tools\repeatable.exe
 $batch = '.\output\<batch-timestamp>' # Replace with the printed batch Output path.
 .\src\WpaFusion.Attribution\bin\Debug\net6.0\wpafusion-attribute.exe $batch

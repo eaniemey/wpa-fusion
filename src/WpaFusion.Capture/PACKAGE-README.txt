@@ -2,7 +2,8 @@ WPA-Fusion Capture - Windows x64
 ================================
 
 Internal experimental Intel tool. For Intel internal use only; do not distribute
-outside Intel. This package contains the collector, not the WPA analysis plugins.
+outside Intel. This package contains the collector and its attribution companion,
+not the WPA analysis plugins.
 
 Prerequisites
 -------------
@@ -25,9 +26,10 @@ Prerequisites
 
 Run
 ---
-1. Extract the ZIP into a writable directory on the target. The collector is a
-   single self-contained wpafusion-capture.exe (the .NET runtime is inside it), so
-   you can also copy just that file. On first run Windows may unpack native
+1. Extract the ZIP into a writable directory on the target. Keep the two
+  self-contained executables together: wpafusion-capture.exe automatically
+  invokes wpafusion-attribute.exe after capture. To copy only the collector,
+  pass --skip-attribute and process the raw data later. On first run Windows may unpack native
    libraries from the exe to a temp folder; locations that block running code from
    temp need an exception.
 2. Open a 64-bit PowerShell terminal as Administrator and change to that
@@ -44,6 +46,19 @@ Run
 
    .\wpafusion-capture.exe --help
    .\wpafusion-capture.exe --duration 10 --output "$PWD\output"
+
+  Automatic attribution/processing is the default. Use the final processed
+  Output path, not the earlier Raw capture path, to open in WPA. The companion
+  can also be found through WPA_FUSION_ATTRIBUTE_EXE or PATH. EMON processing
+  and fusion additionally need Intel MPP, selected by WPA_FUSION_MPP_EXE.
+
+  For a collection-only machine without processing dependencies:
+
+  .\wpafusion-capture.exe --skip-attribute --duration 10 --output "$PWD\output"
+
+  If processing fails, the exit code is non-zero but the successful raw capture
+  is preserved. Inspect ATTRIBUTION-FAILED.txt/post-capture.log and retry the
+  companion on that raw folder; CAPTURE-FAILED.txt means collection itself failed.
 
   Standard SEP sample/stack collection of a workload:
 
@@ -75,8 +90,9 @@ Run
   --sep-start-paused --sep-resume-after 30 --sep-duration 5; ETW remains active
   for the complete workload. Use {run-directory} in workload
    output arguments to avoid overwriting files between executions. On the
-   analysis system, pass the batch folder to wpafusion-attribute to create an
-   explicitly labeled cross-run dataset; it is not simultaneous collection.
+  analysis system, pass the raw batch folder to wpafusion-attribute if capture
+  used --skip-attribute. Otherwise capture already creates the processed fused
+  dataset automatically after both passes; do not process its output again.
 
   For counter-based TMA, use --emon instead of SEP sampling:
 
@@ -93,8 +109,9 @@ Run
   may differ in both events and sampling interval. The chosen file is copied
   as emon-events.txt; the selected metric XML is retained as edp-metrics.xml
   when available. Do not edit an installation file and assume EMON chose it.
-  On the analysis machine, use scripts\process-emon.ps1 with Intel MPP to
-  generate the official metrics and then scripts\open-run.ps1 on its output.
+  Capture invokes its companion to process EMON with Intel MPP by default.
+  scripts\process-emon.ps1 remains available for manually processing raw data
+  collected with --skip-attribute or for time-zone overrides on older captures.
   MPP/Python are separate prerequisites, not bundled in this executable.
 
   LBR call stacks: user-mode SEP last-branch records are enabled by default with
@@ -145,22 +162,22 @@ files together: session.json provides their clock alignment. Do not bind or
 modify the original sample file with external tools. The collector binds it
 after capture.
 
-On the analysis machine, select the processing path for the copied folder:
+After --skip-attribute, or to retry failed processing, select the raw-folder path:
 
   Native SEP: wpafusion-attribute.exe C:\captures\sep-run C:\symbols
-  Raw EMON:  scripts\process-emon.ps1 -Run C:\captures\emon-run
+  Raw EMON:  wpafusion-attribute.exe C:\captures\emon-run
   Pair:      wpafusion-attribute.exe C:\captures\batch C:\symbols
 
 Use the printed Output path, then from a source checkout run:
 
   .\scripts\open-run.ps1 -Run 'C:\captures\processed-output' -NoAttribute
 
-These tools come from the separate attribution package or source
-checkout, not this collector package. Processing creates new output folders.
+The attribution executable is included here and in the standalone attribution
+package; the launcher scripts require a source checkout. Processing creates new output folders.
 Fusion preserves each native SEP/ETL pair and compares separate executions
 using workload markers, never cross-run thread ID matching. Keep the entire
 batch/fused folder tree; copying only sep.tb7 or a metric CSV is insufficient.
-WPA and the plugins are installed separately; this package is the collector only.
+WPA and the plugins are installed separately; no analysis plugin is bundled here.
 Native process/module symbol resolution is not added by packaging the collector.
 Traces can contain sensitive system and process information. Transfer and
 store them only through approved channels.
