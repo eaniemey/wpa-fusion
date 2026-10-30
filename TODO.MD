@@ -1,8 +1,9 @@
 # WPA-Fusion TODO
 
 Prioritized follow-up work. As of 2026-10-30, the documented check
-(`scripts/check.ps1`) passes 106 tests; run it for current totals. Implemented
-features include opt-in SEP+ETL/EMON fusion, SEP-only windows with complete ETL
+(`scripts/check.ps1`) passes 109 tests; run it for current totals. Implemented
+features include automatic post-capture attribution (opt out with
+`--skip-attribute`), opt-in SEP+ETL/EMON fusion, SEP-only windows with complete ETL
 coverage, official MPP metrics, original-order TMA hierarchy restoration, and
 explicit disjoint table ownership. The items below remain outstanding.
 
