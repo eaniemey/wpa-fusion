@@ -190,9 +190,10 @@ internal sealed class SepCollector
         CommandLine = BuildCommandLine(options, _runDir);
         _process = _runner.StartBackground(SepInstall.SepExe, CommandLine, Path.Combine(_runDir, "sep.log"));
         Thread.Sleep(StartupDelay);
-        if (_process.HasExited)
+        if (_process.HasExited && _process.ExitCode != 0)
         {
             var code = _process.ExitCode;
+          _process.Dispose();
             _process = null;
             throw new InvalidOperationException($"SEP exited immediately with code {code}; see sep.log in the run folder.");
         }
@@ -220,9 +221,9 @@ internal sealed class SepCollector
 
       public void Resume()
       {
-        if (_process is null || _process.HasExited)
+        if (_process is null)
         {
-          throw new InvalidOperationException("SEP is not running and cannot be resumed.");
+          throw new InvalidOperationException("SEP collection has not been started and cannot be resumed.");
         }
 
         _runner.Run(SepInstall.SepExe, "-resume", TimeSpan.FromSeconds(30));
@@ -292,4 +293,85 @@ internal sealed class TypePerfCollector
         _log.Info($"typeperf stopped (exit code {(p.HasExited ? p.ExitCode.ToString(CultureInfo.InvariantCulture) : "n/a")}).");
         p.Dispose();
     }
+}
+
+internal sealed class EmonCollector
+{
+  public const string DataFileName = "emon.dat";
+  public const string EventsFileName = "emon-events.txt";
+  private readonly ProcessRunner _runner;
+  private readonly string _runDir;
+  private readonly CaptureOptions _options;
+  private Process? _process;
+
+  public EmonCollector(ProcessRunner runner, string runDir, CaptureOptions options)
+  {
+    _runner = runner;
+    _runDir = runDir;
+    _options = options;
+  }
+
+  public static string Exe => Path.Combine(SepInstall.Bin64, "emon.exe");
+
+  public string CommandLine => BuildCommandLine(_options, _runDir);
+
+  internal static string BuildCommandLine(CaptureOptions options, string runDir)
+  {
+    var events = options.EmonEventsFile is null ? string.Empty :
+      $" {WprCollector.Quote("edp_file=" + Path.Combine(runDir, EventsFileName))}";
+    return $"-collect-edp{events} -l 0 -f {WprCollector.Quote(Path.Combine(runDir, DataFileName))}";
+  }
+
+  public void Start()
+  {
+    if (!File.Exists(Exe))
+    {
+      throw new FileNotFoundException($"EMON not found at '{Exe}'. Set {SepInstall.EnvironmentVariable}.");
+    }
+
+    if (_options.EmonEventsFile is not null)
+    {
+      File.Copy(_options.EmonEventsFile, Path.Combine(_runDir, EventsFileName));
+    }
+
+    _process = _runner.StartBackground(Exe, CommandLine, Path.Combine(_runDir, "emon.log"));
+    if (_process.WaitForExit(2000))
+    {
+      var code = _process.ExitCode;
+      _process.Dispose();
+      _process = null;
+      throw new InvalidOperationException($"EMON exited during startup with code {code}; see emon.log.");
+    }
+  }
+
+  public void Stop()
+  {
+    if (_process is not { } process)
+    {
+      return;
+    }
+
+    _process = null;
+    using (process)
+    {
+      if (!process.HasExited)
+      {
+        _runner.Run(Exe, "-stop", TimeSpan.FromSeconds(30));
+      }
+
+      if (!process.WaitForExit(60_000))
+      {
+        process.Kill(entireProcessTree: true);
+        throw new TimeoutException("EMON did not finish writing its data after -stop.");
+      }
+
+            var data = new FileInfo(Path.Combine(_runDir, DataFileName));
+            if (process.ExitCode != 0 || !data.Exists || data.Length == 0)
+      {
+        throw new InvalidOperationException("EMON collection failed; see emon.log.");
+      }
+
+            EmonMetricDefinitions.Snapshot(data.FullName, _runDir, SepInstall.Root);
+    }
+  }
 }

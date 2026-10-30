@@ -26,6 +26,13 @@ public sealed class SessionManifest
 
     public string Machine { get; set; } = string.Empty;
 
+    public string? CaptureTimeZoneId { get; set; }
+
+    public List<string> WorkloadCommand { get; set; } = new();
+    public List<string> ExecutedWorkloadCommand { get; set; } = new();
+    public int? WorkloadExitCode { get; set; }
+    public CrossRunAlignment? Alignment { get; set; }
+
     /// <summary>SEP platform of the collection machine (from sep -version). Null in older manifests or without SEP.</summary>
     public SepPlatform? Platform { get; set; }
 
@@ -108,6 +115,14 @@ public sealed class SessionManifest
         {
             throw new InvalidDataException($"'{path}' has sync points that do not advance.");
         }
+
+        if (Alignment is { } alignment &&
+            (alignment.SourceRunId != RunId || string.IsNullOrWhiteSpace(alignment.ReferenceRunId) ||
+             alignment.SourceWorkloadDurationNs <= 0 || alignment.ReferenceWorkloadDurationNs <= 0 ||
+             alignment.ReferenceZeroFileTimeUtc <= 0 || alignment.ReferenceZeroFileTimeUtc > DateTime.MaxValue.ToFileTimeUtc()))
+        {
+            throw new InvalidDataException($"'{path}' has invalid cross-run alignment metadata.");
+        }
     }
 }
 
@@ -133,6 +148,12 @@ public sealed class SessionFiles
     public string? LegacyCounters { get => null; set => TypeperfCounters ??= value; }
 
     public string? Tb7 { get; set; }
+
+    public string? EmonDat { get; set; }
+    public string? EmonEvents { get; set; }
+    public string? EmonDefinition { get; set; }
+
+    public string? EmonMetrics { get; set; }
 }
 
 /// <summary>A marker event written into the ETL, with the clock values it carries.</summary>

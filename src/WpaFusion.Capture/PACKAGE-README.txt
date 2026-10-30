@@ -45,7 +45,7 @@ Run
    .\wpafusion-capture.exe --help
    .\wpafusion-capture.exe --duration 10 --output "$PWD\output"
 
-   Standard collection of a workload (default TMA events):
+  Standard SEP sample/stack collection of a workload:
 
    .\wpafusion-capture.exe --duration 10 --output "$PWD\output" -- C:\Tools\workload.exe
 
@@ -59,8 +59,43 @@ Run
    SEP resumes on Enter, then waits the configured sampling delay before its
    samples begin. If --duration is also supplied, its timer starts at resume.
 
-   Do not pass --sep-events together with the default analysis type if you want
-   TMA: --sep-events replaces it with only the events you list.
+  For an automated 30-second workload warmup followed by five seconds of SEP,
+  while retaining ETW/Typeperf through the complete workload:
+
+  .\wpafusion-capture.exe --sep-start-paused --sep-resume-after 30 --sep-duration 5 `
+     --output "$PWD\output" -- C:\Tools\workload.exe
+
+   Single-run mode remains the default. Opt into one repeated SEP+ETL/EMON pair:
+
+   .\wpafusion-capture.exe --runs 2 --output "$PWD\output" -- C:\Tools\repeatable.exe
+
+   This executes the workload twice to completion: SEP always has its own ETL;
+  EMON runs separately without ETW. Do not combine --runs 2 with --duration,
+  manual pause, --emon, --no-sep, or --no-etw. Timed SEP windows can use
+  --sep-start-paused --sep-resume-after 30 --sep-duration 5; ETW remains active
+  for the complete workload. Use {run-directory} in workload
+   output arguments to avoid overwriting files between executions. On the
+   analysis system, pass the batch folder to wpafusion-attribute to create an
+   explicitly labeled cross-run dataset; it is not simultaneous collection.
+
+  For counter-based TMA, use --emon instead of SEP sampling:
+
+  .\wpafusion-capture.exe --emon --duration 30 --output "$PWD\output"
+
+  This collects emon.dat with -collect-edp while WPR and Typeperf run. SEP and
+  EMON do not run concurrently; SEP pause/delay flags do not apply to EMON.
+  Add --no-etw for standalone EMON. To use an edited event list explicitly:
+
+  .\wpafusion-capture.exe --emon --no-etw --duration 30 --output "$PWD\output" `
+    --emon-events "$env:WPA_FUSION_SEP_ROOT\config\edp\sapphirerapids_server_events.txt"
+
+  Select the event file for the collection platform. Public/private/nda lists
+  may differ in both events and sampling interval. The chosen file is copied
+  as emon-events.txt; the selected metric XML is retained as edp-metrics.xml
+  when available. Do not edit an installation file and assume EMON chose it.
+  On the analysis machine, use scripts\process-emon.ps1 with Intel MPP to
+  generate the official metrics and then scripts\open-run.ps1 on its output.
+  MPP/Python are separate prerequisites, not bundled in this executable.
 
   LBR call stacks: user-mode SEP last-branch records are enabled by default with
   --sep-lbr call_stack:usr. Use --sep-lbr call_stack:os for kernel mode, or
@@ -70,8 +105,10 @@ Run
   LBR makes .tb7 files large (about 1 KB per sample): thin samples with
   --sep-args "-sam 4" (try -sam 2 for short runs, larger values for long ones).
 
-   A run is reported successful only if its ETL, typeperf CSV (when enabled) and
-   bound sep.tb7 exist, and session.json is written. On any failure the exit code is
+  A run is successful only when enabled outputs exist and session.json is
+  written: ETL and Typeperf CSV if enabled, a bound sep.tb7 for SEP, or emon.dat
+  for EMON. A pair also requires both workload executions to exit successfully.
+  On failure the exit code is
    non-zero and the run folder contains CAPTURE-FAILED.txt; do not use such a folder.
 
    Always supply --output as shown for a predictable portable output location.
@@ -96,8 +133,9 @@ Troubleshooting
 - --no-sep allows an ETW/Typeperf capture without SEP; --no-typeperf skips Typeperf.
 - The collector detects the platform with "sep -version", records its platform
   type, PMU, and CPU name in session.json, and checks the selected analysis type
-  against "sep -atypelist" before collection. TMA analysis uses the SEP EDP
-  metric file for that PMU from the analysis machine's SEP installation.
+  against "sep -atypelist" before SEP collection. EMON -collect-edp writes its
+  own platform metadata. Intel MPP processes those counters; WPA does not derive
+  TMA from SEP samples. XML snapshots preserve the full original hierarchy.
 
 Return the results
 ------------------
@@ -107,10 +145,21 @@ files together: session.json provides their clock alignment. Do not bind or
 modify the original sample file with external tools. The collector binds it
 after capture.
 
-On the analysis machine, run wpafusion-attribute on the copied run directory
-(from the WPA-Fusion build, not this package) to write the module/function and
-LBR stack sidecars into a NEW output run, then open that new run in WPA with the
-WPA-Fusion plugins. Opening the raw capture folder shows no stacks or module names.
+On the analysis machine, select the processing path for the copied folder:
+
+  Native SEP: wpafusion-attribute.exe C:\captures\sep-run C:\symbols
+  Raw EMON:  scripts\process-emon.ps1 -Run C:\captures\emon-run
+  Pair:      wpafusion-attribute.exe C:\captures\batch C:\symbols
+
+Use the printed Output path, then from a source checkout run:
+
+  .\scripts\open-run.ps1 -Run 'C:\captures\processed-output' -NoAttribute
+
+These tools come from the separate attribution package or source
+checkout, not this collector package. Processing creates new output folders.
+Fusion preserves each native SEP/ETL pair and compares separate executions
+using workload markers, never cross-run thread ID matching. Keep the entire
+batch/fused folder tree; copying only sep.tb7 or a metric CSV is insufficient.
 WPA and the plugins are installed separately; this package is the collector only.
 Native process/module symbol resolution is not added by packaging the collector.
 Traces can contain sensitive system and process information. Transfer and

@@ -6,7 +6,7 @@ namespace WpaFusion.Capture.Clocks;
 /// <summary>
 /// Raw clock reads for sync points. .NET has no rdtsc intrinsic, so a 12-byte x64 stub is placed
 /// in executable memory once and called through a function pointer.
-/// Kernel32 interop for clocks lives here (DECISIONS.md); TBRW interop lives in WpaFusion.Tbrw.
+/// Kernel32 clock interop lives here; TBRW interop lives in WpaFusion.Tbrw.
 /// </summary>
 internal static unsafe class NativeClock
 {

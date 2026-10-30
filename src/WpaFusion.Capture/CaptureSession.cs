@@ -17,10 +17,13 @@ internal sealed class CaptureSession
 
     public CaptureSession(CaptureOptions options) => _options = options;
 
+    public string? RunDirectory { get; private set; }
+
     public int Run()
     {
         var outputRoot = _options.OutputRoot ?? RunFolder.DefaultOutputRoot();
         var runDir = RunFolder.Create(outputRoot, DateTime.Now);
+        RunDirectory = runDir;
         using var log = new RunLog(Path.Combine(runDir, "capture.log"));
         var runner = new ProcessRunner(log);
         log.Info($"Run folder: {runDir}");
@@ -47,6 +50,9 @@ internal sealed class CaptureSession
         {
             RunId = Path.GetFileName(runDir),
             Machine = Environment.MachineName,
+            CaptureTimeZoneId = TimeZoneInfo.Local.Id,
+            WorkloadCommand = _options.Workload.ToList(),
+            ExecutedWorkloadCommand = _options.Workload.Select(argument => argument.Replace("{run-directory}", runDir, StringComparison.Ordinal)).ToList(),
             QpcFrequency = NativeClock.QpcFrequency,
         };
 
@@ -57,12 +63,17 @@ internal sealed class CaptureSession
             manifest.Platform = DetectSepPlatform(log);
         }
 
-        log.Info(_options.SepLbr is null
-            ? "SEP LBR call stacks: off."
-            : $"SEP LBR call stacks: -lbr {_options.SepLbr} (large .tb7; use --sep-args \"-sam N\" to thin samples).");
+        if (_options.Sep)
+        {
+            log.Info(_options.SepLbr is null
+                ? "SEP LBR call stacks: off."
+                : $"SEP LBR call stacks: -lbr {_options.SepLbr} (large .tb7; use --sep-args \"-sam N\" to thin samples).");
+        }
         if (_options.SepStartPaused)
         {
-            log.Info("SEP will start paused; press Enter after the workload starts to resume it.");
+            log.Info(_options.SepResumeAfterSeconds is { } delay
+                ? $"SEP will start paused and resume {delay.ToString(CultureInfo.InvariantCulture)} seconds after workload launch."
+                : "SEP will start paused; press Enter after the workload starts to resume it.");
         }
 
         if (_options.SepSamplingDelaySeconds > 0)
@@ -72,6 +83,7 @@ internal sealed class CaptureSession
 
         var wpr = _options.Etw ? new WprCollector(runner, log, runDir) : null;
         var sep = _options.Sep ? new SepCollector(runner, log, runDir) : null;
+        var emon = _options.Emon ? new EmonCollector(runner, runDir, _options) : null;
         var typeperf = _options.Typeperf ? new TypePerfCollector(runner, log, runDir) : null;
 
         try
@@ -95,18 +107,32 @@ internal sealed class CaptureSession
                 manifest.Tools["typeperf"] = typeperf.CommandLine;
             }
 
+            if (emon is not null)
+            {
+                emon.Start();
+                manifest.Tools["emon"] = emon.CommandLine;
+            }
+
             Thread.Sleep(500);
             manifest.SyncStart = SyncSampler.Capture();
             manifest.TscSurvey = SyncSampler.SurveyAllCpus();
             WriteMarkers(manifest, "start");
             log.Info($"Collecting. Sync start spread: {manifest.SyncStart.TscSpread} TSC ticks.");
 
-            WaitForWorkload(log, sep is not null && _options.SepStartPaused
+            WaitForWorkload(log, manifest, sep is not null && _options.SepStartPaused
                 ? () =>
                 {
                     sep.Resume();
                     WriteMarker(manifest, "sep-resume", 0);
                     log.Info("SEP resumed; sampling delay, if configured, now applies.");
+                }
+                : null, sep is not null && _options.SepDurationSeconds is not null
+                ? () =>
+                {
+                    WriteMarker(manifest, "sep-window-end", 0);
+                    sep.Stop();
+                    WriteMarker(manifest, "sep-stopped", 0);
+                    log.Info("SEP sampling window complete; ETW and other enabled collectors continue until workload exit.");
                 }
                 : null);
 
@@ -117,6 +143,7 @@ internal sealed class CaptureSession
         catch
         {
             typeperf?.Stop();
+            TryRun(log, () => emon?.Stop());
             TryRun(log, () => sep?.Stop());
             wpr?.Cancel();
             throw;
@@ -124,6 +151,7 @@ internal sealed class CaptureSession
 
         // Stop in reverse order.
         typeperf?.Stop();
+        emon?.Stop();
         sep?.Stop();
         wpr?.Stop();
 
@@ -137,6 +165,14 @@ internal sealed class CaptureSession
         {
             BindTb7(log, sep.Tb7Path);
             manifest.Files.Tb7 = Path.GetFileName(sep.Tb7Path);
+        }
+
+        if (emon is not null)
+        {
+            manifest.Files.EmonDat = EmonCollector.DataFileName;
+            manifest.Files.EmonEvents = _options.EmonEventsFile is null ? null : EmonCollector.EventsFileName;
+            manifest.Files.EmonDefinition = File.Exists(Path.Combine(runDir, EmonMetricDefinitions.SnapshotFileName))
+                ? EmonMetricDefinitions.SnapshotFileName : null;
         }
 
         VerifyArtifacts(runDir, wpr, typeperf);
@@ -217,19 +253,28 @@ internal sealed class CaptureSession
         manifest.Markers.Add(new SessionMarker(name, index, point.Tsc, point.Qpc, point.FileTimeUtc) { Cpu = cpu });
     }
 
-    private void WaitForWorkload(RunLog log, Action? resumeSep)
+    private void WaitForWorkload(RunLog log, SessionManifest manifest, Action? resumeSep, Action? stopSep)
     {
         if (_options.Workload.Count > 0)
         {
-            var psi = new ProcessStartInfo(_options.Workload[0]) { UseShellExecute = false };
-            foreach (var a in _options.Workload.Skip(1))
+            var command = manifest.ExecutedWorkloadCommand;
+            var psi = new ProcessStartInfo(command[0]) { UseShellExecute = false };
+            foreach (var a in command.Skip(1))
             {
                 psi.ArgumentList.Add(a);
             }
 
-            log.Info($"Running workload: {string.Join(" ", _options.Workload)}");
+            log.Info($"Running workload: {string.Join(" ", command)}");
+            WriteMarker(manifest, "workload-start", 0);
             using var p = Process.Start(psi) ?? throw new InvalidOperationException("Workload did not start.");
-            ResumeSepWhenRequested(log, resumeSep);
+            ResumeSepWhenRequested(log, resumeSep, p);
+            if (_options.SepDurationSeconds is { } window && stopSep is not null)
+            {
+                log.Info($"Recording a {window.ToString(CultureInfo.InvariantCulture)} second SEP-only window; ETW will retain the complete workload.");
+                p.WaitForExit((int)Math.Ceiling(window * 1000));
+                stopSep();
+            }
+
             if (_options.DurationSeconds is double limit)
             {
                 if (!p.WaitForExit((int)(limit * 1000)))
@@ -240,6 +285,12 @@ internal sealed class CaptureSession
             else
             {
                 p.WaitForExit();
+            }
+
+            if (p.HasExited)
+            {
+                WriteMarker(manifest, "workload-end", 0);
+                manifest.WorkloadExitCode = p.ExitCode;
             }
 
             log.Info(p.HasExited ? $"Workload exited with code {p.ExitCode}." : "Stopping collection.");
@@ -259,16 +310,35 @@ internal sealed class CaptureSession
         Console.ReadLine();
     }
 
-    private static void ResumeSepWhenRequested(RunLog log, Action? resumeSep)
+    private void ResumeSepWhenRequested(RunLog log, Action? resumeSep, Process? workload = null)
     {
         if (resumeSep is null)
         {
             return;
         }
 
-        log.Info("ETW and Typeperf are collecting; SEP is started but paused.");
-        Console.WriteLine("Press Enter when the workload reaches the desired point to resume SEP sampling.");
-        Console.ReadLine();
+        if (_options.SepResumeAfterSeconds is { } seconds)
+        {
+            log.Info($"SEP remains paused for {seconds.ToString(CultureInfo.InvariantCulture)} seconds; other enabled collectors continue.");
+            if (workload is not null)
+            {
+                if (workload.WaitForExit((int)Math.Ceiling(seconds * 1000)))
+                {
+                    throw new InvalidOperationException("The workload exited before the timed SEP resume point.");
+                }
+            }
+            else
+            {
+                Thread.Sleep(TimeSpan.FromSeconds(seconds));
+            }
+        }
+        else
+        {
+            log.Info("Other enabled collectors are collecting; SEP is started but paused.");
+            Console.WriteLine("Press Enter when the workload reaches the desired point to resume SEP sampling.");
+            Console.ReadLine();
+        }
+
         resumeSep();
     }
 
@@ -365,8 +435,20 @@ internal sealed class CaptureSession
         }
     }
 
-    private static void PrintOpenHint(RunLog log, string runDir, SessionManifest manifest)
+    private void PrintOpenHint(RunLog log, string runDir, SessionManifest manifest)
     {
+        if (!_options.SkipAttribute && (manifest.Files.Tb7 is not null || manifest.Files.EmonDat is not null))
+        {
+            log.Info("Raw capture is finalized; automatic attribution will report the processed dataset after collection completes.");
+            return;
+        }
+
+        if (manifest.Files.EmonDat is not null)
+        {
+            log.Info($"EMON counters captured. Process with Intel MPP via scripts\\process-emon.ps1 -Run \"{runDir}\"; scripts\\open-run.ps1 can process and open the result.");
+            return;
+        }
+
         var files = new[] { manifest.Files.Etl, manifest.Files.TypeperfCsv, manifest.Files.Tb7 }.Where(f => f is not null).Select(f => Path.Combine(runDir, f!));
         log.Info("Open in WPA (one session): wpa.exe " + string.Join(" ", files.Select(f => $"-i \"{f}\"")));
         log.Info($"On the analysis machine: scripts\\open-run.ps1 -Run \"{runDir}\"");

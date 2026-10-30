@@ -96,7 +96,11 @@ public sealed class SepData
     /// <summary>session.json next to the .tb7, or null.</summary>
     public SessionManifest? Manifest { get; private init; }
 
-    public string ProcessName(uint pid) => _processNames.TryGetValue(pid, out var n) && n.Length > 0 ? n : "Unknown";
+    public string ProcessName(uint pid)
+    {
+        var name = _processNames.TryGetValue(pid, out var value) && value.Length > 0 ? value : "Unknown";
+        return Manifest?.Alignment is { } alignment ? $"{name} [SEP run {alignment.SourceRunId}; cross-run aligned]" : name;
+    }
 
     public string ThreadName(uint pid, uint tid) => _threadNames.TryGetValue((pid, tid), out var n) ? n : string.Empty;
 
@@ -167,6 +171,17 @@ public sealed class SepData
             var spanTicks = (long)((max - min) / tscFrequency * TimeSpan.TicksPerSecond);
             zeroUtc = File.GetLastWriteTimeUtc(tb7Path).AddTicks(-spanTicks);
             source = "nominal CPU frequency (no session.json; wall clock approximate)";
+        }
+
+        if (timeline?.Manifest?.Alignment is { } alignment)
+        {
+            for (var index = 0; index < timeNs.Length; index++)
+            {
+                timeNs[index] = checked(timeNs[index] + alignment.OffsetNs);
+            }
+
+            zeroUtc = DateTime.FromFileTimeUtc(alignment.ReferenceZeroFileTimeUtc);
+            source += $", cross-run workload-start alignment to {alignment.ReferenceRunId}";
         }
 
         var processNames = file.Processes.GroupBy(p => p.Pid).ToDictionary(g => g.Key, g => g.First().Name);

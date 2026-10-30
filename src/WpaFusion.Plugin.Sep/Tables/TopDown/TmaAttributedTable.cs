@@ -10,7 +10,7 @@ public static class TmaAttributedTable
     private const string Suffix = "5E6F7A8B9C03";
     public static TableDescriptor TableDescriptor { get; } = new(
         Guid.Parse("{D4B8F2C6-1A2B-4E1A-9C3D-5E6F7A8B9C03}"),
-        "Top-Down by Process, Module, Function (TMA)",
+        "Top-Down by Process, Module (TMA)",
         "Sampled TMA estimates recomputed per entity. Percentages are not additive; sparse samples and multiplexing can bias results.",
         "WPA-Fusion", isMetadataTable: false, defaultLayout: TableLayoutStyle.GraphAndTable,
         requiredDataCookers: null);
@@ -22,7 +22,6 @@ public static class TmaAttributedTable
     private static readonly ColumnConfiguration Scope = Col("0020", "Attribution Scope");
     private static readonly ColumnConfiguration Process = Col("0021", "Process");
     private static readonly ColumnConfiguration Module = Col("0022", "Module");
-    private static readonly ColumnConfiguration Function = Col("0023", "Function");
     private static readonly ColumnConfiguration Window = Col("0024", "Window");
     private static readonly ColumnConfiguration Samples = Col("0025", "Supporting Samples", AggregationMode.Max);
     private static readonly ColumnConfiguration Time = Col("0026", "Slice Start", AggregationMode.Min);
@@ -36,21 +35,21 @@ public static class TmaAttributedTable
 
     internal static void Build(ITableBuilder builder, SepData data, TmaAnalysis analysis)
     {
-        var windows = analysis.Attributed;
-        var nodes = analysis.Metrics?.Nodes.Count ?? 0;
+        var windows = analysis.Attributed.Where(window => window.Key.Scope != "Function").ToArray();
+        var nodes = analysis.Metrics?.Nodes.Count(node => node.IsTopDown) ?? 0;
         AttributedTmaWindow Row(int i) => windows[i / nodes];
         var defaultConfiguration = new TableConfiguration("By Process Over Time");
-        foreach (var scope in new[] { "Process", "Module", "Function" })
+        foreach (var scope in new[] { "Process", "Module" })
         {
             foreach (var summary in new[] { false, true })
             {
                 var configuration = !summary && scope == "Process" ? defaultConfiguration :
                     new TableConfiguration($"By {scope} {(summary ? "Whole Run" : "Over Time")}");
-                configuration.Columns = new[] { Process, Instance, Module, Function, Metric,
+                configuration.Columns = new[] { Process, Instance, Module, Metric,
                     TableConfiguration.PivotColumn, Scope, Window, Depth, Status, Samples, Time, Duration,
                     EstimatedCpuUsage, TableConfiguration.GraphColumn, Value };
                 configuration.ChartType = ChartType.Line;
-                configuration.InitialFilterQuery = $"[Attribution Scope]:=\"{scope}\" AND [Window]:=\"{(summary ? "Summary" : "Slice")}\" AND [Depth]:=1";
+                configuration.InitialFilterQuery = $"[Attribution Scope]:=\"{scope}\" AND [Window]:=\"{(summary ? "Summary" : "Slice")}\"";
                 configuration.InitialFilterShouldKeep = true;
                 configuration.AddColumnRole(ColumnRole.StartTime, Time);
                 configuration.AddColumnRole(ColumnRole.Duration, Duration);
@@ -59,14 +58,13 @@ public static class TmaAttributedTable
         }
 
         builder.SetDefaultTableConfiguration(defaultConfiguration)
-            .SetRowCount(checked(windows.Count * nodes))
+            .SetRowCount(checked(windows.Length * nodes))
             .AddColumn(Scope, Projection.CreateUsingFuncAdaptor(i => Row(i).Key.Scope))
             .AddColumn(Process, Projection.CreateUsingFuncAdaptor(i =>
                 $"{(string.IsNullOrEmpty(Row(i).Key.ProcessName) ? data.ProcessName(Row(i).Key.Pid) : Row(i).Key.ProcessName)} ({Row(i).Key.Pid})"))
             .AddColumn(Instance, Projection.CreateUsingFuncAdaptor(i => Row(i).Key.ProcessStartNs == long.MinValue
                 ? "Start unavailable" : Row(i).Key.ProcessStartNs.ToString(System.Globalization.CultureInfo.InvariantCulture)))
             .AddColumn(Module, Projection.CreateUsingFuncAdaptor(i => Row(i).Key.Module))
-            .AddColumn(Function, Projection.CreateUsingFuncAdaptor(i => Row(i).Key.Function))
             .AddColumn(Window, Projection.CreateUsingFuncAdaptor(i => Row(i).IsSummary ? "Summary" : "Slice"))
             .AddColumn(Samples, Projection.CreateUsingFuncAdaptor(i => Row(i).Window.Samples))
             .AddColumn(Time, Projection.CreateUsingFuncAdaptor(i => new Timestamp(Row(i).Window.StartNs)))

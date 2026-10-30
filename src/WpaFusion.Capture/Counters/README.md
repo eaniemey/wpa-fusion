@@ -9,3 +9,17 @@
 - The file is also built into `wpafusion-capture` as an embedded resource, so the tool works without the source tree. Each run copies the counter list it used into its output folder.
 
 The original package's `start_typeperf.bat` refers to `StandardTypePerfInput.txt`, which is not in that package, and stops typeperf with `taskkill /F`. The capture tool replaces both scripts.
+
+## Override the counter list
+
+Supply an existing text file with appropriate paths for the collection system:
+
+```powershell
+$counters = 'C:\Counters\localized-counters.txt' # Replace with an existing list.
+.\src\WpaFusion.Capture\bin\Debug\net10.0\wpafusion-capture.exe `
+	--counters $counters --interval 1 --duration 10 --output .\output
+```
+
+The built-in list uses English names and may fail on localized Windows. Use
+`--no-typeperf` to disable collection. Capturing a CSV does not display it in
+WPA; the Typeperf processing source remains intentionally unstaged.

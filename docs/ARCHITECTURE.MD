@@ -3,7 +3,9 @@
 WPA-Fusion coordinates independent performance sources and aligns them on one
 timeline. It does not merge SEP or Typeperf records into ETW, rewrite the ETL,
 or turn the sources into a new combined trace. WPA continues to process ETW
-natively; the WPA-Fusion plugin contributes SEP tables.
+natively; the WPA-Fusion plugin contributes SEP sample/stack and EMON metric
+tables. A fused dataset is a folder of distinct, preserved inputs, not a
+rewritten ETL or a claim that separate executions occurred simultaneously.
 
 The result is a shared timeline plus optional attribution, not proof of
 causality: coincident changes across ETW and hardware counters help investigate
@@ -17,6 +19,7 @@ Typeperf counters are not currently displayed in WPA.
 wpafusion-capture
   WPR       -> trace.etl
   SEP       -> sep.tb7 (bound before the run is considered complete)
+  or EMON   -> emon.dat (-collect-edp; replaces SEP, not concurrent)
   Typeperf  -> typeperf.csv
   clocks    -> session.json (TSC/QPC/UTC sync points and ETL time origin)
   platform  -> session.json (SEP platform, PMU, and CPU name)
@@ -27,9 +30,22 @@ wpafusion-attribute (offline, optional)
     -> sep.tb7.lbrstacks.json (when LBR data is present)
     -> sep.tb7.sampledstacks.json (when requested and matching ETW samples exist)
 
+scripts/process-emon.ps1 (offline, EMON runs only)
+  emon.dat -> Intel MPP -> system-view details/summary CSVs + metrics.emon.json
+
+wpafusion-capture --runs 2 (explicit opt-in)
+  pass 1: workload + SEP + its concurrent ETL
+  pass 2: repeated workload + standalone EMON (no ETL)
+  -> capture-batch.json + two native run folders
+
+wpafusion-attribute <batch folder>
+  native SEP/ETL attribution + Intel MPP processing
+  -> new fused folder: fusion.json + copied source runs + marker alignment metadata
+
 WPA
   trace.etl -> native ETW tables
-  sep.tb7   -> WPA-Fusion SEP sample, stack, and TMA tables
+  sep.tb7   -> WPA-Fusion SEP sample and stack tables
+  metrics.emon.json -> EMON/MPP global TMA summary and timeline
   session.json -> clock markers and shared timeline metadata
 ```
 
@@ -66,10 +82,10 @@ the manifest and timeline contract.
 | Project | Responsibility | Dependencies / boundary |
 |---|---|---|
 | `WpaFusion.Common` | `session.json`, run folders, clock map, shared time values. | No project dependencies. |
-| `WpaFusion.Capture` | Starts/stops WPR, Typeperf, and SEP; surveys clocks; binds `.tb7`; writes manifest. | References Common and Tbrw; runs elevated for collection. |
-| `WpaFusion.Tbrw` | Read-only managed API over SEP's native TBRW DLL; marshaling, native handles, sample/layout streaming. | No project dependencies; all P/Invoke stays here. |
-| `WpaFusion.Tma` | SEP EDP metric loading, formula evaluation, multiplex estimates. | References Common; no WPA SDK dependency. |
-| `WpaFusion.Plugin.Sep` | Loads `.tb7`, maps processed values to WPA tables and views. | References Common, Tbrw, Tma, and WPA SDK. No TraceProcessor/symbol engine. |
+| `WpaFusion.Capture` | Starts/stops WPR, Typeperf, and SEP or EMON; surveys clocks; records workload markers; supports optional two-pass capture. | References Common and Tbrw; runs elevated; includes native Windows clock/affinity helpers. |
+| `WpaFusion.Tbrw` | Read-only managed API over SEP's native TBRW DLL; marshaling, native handles, sample/layout streaming. | No project dependencies; TBRW P/Invoke stays here. |
+| `WpaFusion.Tma` | EMON/MPP metric import and legacy experimental formula utilities. | References Common; no WPA SDK dependency. |
+| `WpaFusion.Plugin.Sep` | Two sources: `.tb7` samples/stacks and `.emon.json` metric views, with disjoint table ownership. | References Common, Tbrw, Tma, and WPA SDK. No TraceProcessor/symbol engine. |
 | `WpaFusion.Plugin.Typeperf` | CSV processing source and counter table implementation. | References Common and WPA SDK; retained, not staged currently. |
 | `WpaFusion.Attribution` | Resolves sample addresses/stacks using ETL process/image lifetimes and optional symbols. | Runs outside WPA; uses TraceProcessing and the SEP plugin's sidecar contracts. |
 | `WpaFusion.Tests` | Unit tests and headless Toolkit Engine plugin tests. | Exercises project logic without launching WPA. |
@@ -78,6 +94,10 @@ Plugin classes should primarily describe columns and projections. Parsing,
 clock conversion, stack joining, and metric evaluation stay in reusable classes
 that can be tested independently of WPA.
 
+SEP owns four sample/stack tables and EMON owns two global metric tables.
+Returning no data does not remove a registration: sources must not discover
+the same table GUIDs, or WPA rejects the plugin when both are loaded.
+
 Project contracts and implementation notes:
 
 - [Capture](../src/WpaFusion.Capture/INTERFACE.md) coordinates WPR, Typeperf,
@@ -85,8 +105,8 @@ Project contracts and implementation notes:
 - [Common](../src/WpaFusion.Common/INTERFACE.md) owns the shared clock map and
   `session.json` contract.
 - [Tbrw](../src/WpaFusion.Tbrw/INTERFACE.md) wraps SEP's native sample reader.
-- [Tma](../src/WpaFusion.Tma/INTERFACE.md) loads SEP EDP metrics and evaluates
-  formulas without a WPA dependency.
+- [Tma](../src/WpaFusion.Tma/INTERFACE.md) imports Intel MPP interval and
+  summary metrics without a WPA dependency.
 - [SEP plugin](../src/WpaFusion.Plugin.Sep/INTERFACE.md) exposes the `.tb7`
   data through WPA tables.
 - [Typeperf source](../src/WpaFusion.Plugin.Typeperf/INTERFACE.md) retains the
@@ -118,28 +138,36 @@ them.
 
 ## TMA behavior and limitations
 
-The TMA evaluator uses the SEP EDP metric file for the collection platform's PMU
-(`SEP_ROOT/config/edp/<pmu>.xml`, trying public, `_nda`, then `_private` files).
-Capture records the platform from `sep -version`; for older runs, local SEP
-resolves it from the `.tb7` CPUID signature using `sep -pl`. If no platform or
-matching metric file is available, TMA reports unavailable rather than falling
-back to another metric database.
-Unknown events are errors rather than implicit zero counts. Global event
-counts are based on sample-after values and may be adjusted by multiplex
-scales.
+WPA TMA views use only official Intel MPP output from EMON `-collect-edp`
+captures. MPP reads the collected platform metadata, selects the corresponding
+EDP definitions, and performs counter normalization and formula evaluation.
+The plugin imports MPP's system-view details and aggregated summary CSVs; it
+does not estimate these values from SEP samples or recalculate the formulas.
 
-Attributed TMA groups samples by process, module, or function and re-evaluates
-each metric from that group's sampled event counts. Percentages are not
-additive, so a displayed parent rollup is not a recomputed parent metric.
-Buckets below 100 supporting samples, unsupported metrics, missing inputs,
-zero denominators, and out-of-range percentages are marked unavailable rather
-than presented as plausible values. The 100-sample rule is a display heuristic,
-not a statistical confidence guarantee.
+The global summary and timeline retain all MPP metrics, including non-TMA
+categories. TMA defaults to its original hierarchy and definition order from
+the captured platform's XML, with an expandable column for every depth. Nodes
+omitted by MPP remain visible as unavailable placeholders, preserving their
+original parents and sibling order. No values are inferred for these nodes.
+`All EDP Metrics Over Time` remains a flat list of available metric series;
+select compatible units to avoid scale distortion. Only this flat preset
+filters unavailable readings; TMA trees retain the full breakdown. Value is
+in each formula's native units; Status explains missing
+inputs instead of hiding definitions. Blank MPP cells remain unavailable;
+multiplexed intervals may not have a value for every metric. The displayed
+`Average Value` is the arithmetic mean of valid samples for that metric across
+the whole run, with its valid-interval count shown. Intel's independent
+aggregate is retained separately as `MPP Aggregate`; neither value fills the
+raw timeline's gaps. The arithmetic mean is not time-weighted.
 
-Global multiplex scales can bias short-lived functions, and the current TMA
-results are experimental estimates that require reference validation. Estimated
-CPU usage from reference cycles is a sampled PMU estimate; it is not WPA's
-scheduler-derived CPU Usage (Precise).
+Process/module/function TMA is not exposed because system-wide EMON results
+cannot identify the process responsible for a counter increment. SEP continues
+to provide independently collected sample and stack attribution.
+
+MPP local interval-end timestamps are converted with the collection time-zone
+ID and aligned to the manifest's ETL UTC origin. DST-ambiguous times are
+rejected. EMON and SEP capture modes are mutually exclusive to avoid unverified
+PMU sharing. The older sampled evaluator remains experimental/test code only.
 
 ## End-to-end workflow
 
@@ -166,6 +194,19 @@ collector launches the workload and waits for Enter, then resumes SEP and
 records a `sep-resume` marker. Add `--sep-sampling-delay <seconds>` to delay
 actual SEP sampling after resume; `--duration` begins at resume and includes
 that delay.
+
+For automatic warmup and a short SEP window within the full workload ETL:
+
+```powershell
+.\src\WpaFusion.Capture\bin\Debug\net10.0\wpafusion-capture.exe `
+  --sep-start-paused --sep-resume-after 30 --sep-duration 5 `
+  --output .\output -- C:\Tools\workload.exe
+```
+
+Only SEP stops at the window limit. ETW/Typeperf continue to workload exit,
+and SEP timestamps remain in the native ETL coordinate system. `--duration`
+instead caps every collector and may omit the rest of the workload. Native
+ETLs are copied byte-for-byte during attribution and fusion, never cropped.
 
 The default WPR profile records context switches and their stacks, not periodic
 CPU samples. `--wpr-profile GeneralProfile` adds CPU sampling if investigating
@@ -217,7 +258,7 @@ Run the attribution tool against a completed capture before opening it in WPA:
 
 ```powershell
 .\src\WpaFusion.Attribution\bin\Debug\net6.0\wpafusion-attribute.exe `
-  .\output\<timestamp> C:\symbols --stacks lbr
+  '.\output\<capture-timestamp>' C:\symbols --stacks lbr
 ```
 
 Attribution checks each sample's PID, timestamp, and instruction pointer
@@ -250,14 +291,37 @@ $run = ".\output\<processed-timestamp>"
 ```
 
 The SEP plugin loads the adjacent manifest and sidecars. WPA continues to show
-ETW through its native tables and adds SEP samples, TMA, and available stack
+ETW through its native tables and adds SEP samples and available stack
 views. The Typeperf CSV stays in the run folder but is not passed to WPA until
 its processing source is re-enabled.
 
-For attributed TMA, choose the matching process/module/function scope preset.
-Metrics are recalculated from each scope's event counts, not averaged from
-percentages. Percentages are non-additive; collapsed percentage display
-rollups use Max and are not recomputed parent ratios.
+For TMA, collect with `--emon`, process using `scripts/process-emon.ps1`, and
+open the processed run with `scripts/open-run.ps1`. The launcher passes the
+EMON descriptor and optional ETL to WPA. Standalone EMON uses its recorded
+clock anchors. Old SEP-only captures do not contain the EMON
+counter data needed for these views.
+
+### 5. Compare repeatable executions
+
+```powershell
+.\src\WpaFusion.Capture\bin\Debug\net10.0\wpafusion-capture.exe `
+  --runs 2 --sep-start-paused --sep-resume-after 30 --sep-duration 5 `
+  --output .\output -- C:\Tools\repeatable.exe
+$batch = '.\output\<batch-timestamp>' # Replace with the printed batch Output path.
+.\src\WpaFusion.Attribution\bin\Debug\net6.0\wpafusion-attribute.exe $batch
+$fused = '.\output\<timestamp-with-milliseconds>-fused' # Use attribution's Output path.
+.\scripts\open-run.ps1 -Run $fused -NoAttribute
+```
+
+Fusion is never the default. Version 1 accepts one successful SEP+ETL/EMON pair
+with identical workload command templates on the same machine. Native SEP
+attribution happens before alignment, using that pass's own ETL and IDs.
+Display-time offsets align workload-start markers to the reference SEP ETL;
+no stretching, cross-run ID matching, or process attribution of EMON is performed.
+The reference ETL is opened intact; source labels and `fusion.json` retain
+provenance and duration differences, with an extra warning above 10% mismatch.
+See the developer guide for `{run-directory}` output arguments and the full
+Arnold example. Non-repeatable phase behavior can invalidate a comparison.
 
 ## Accuracy and operational tradeoffs
 
@@ -268,7 +332,7 @@ rollups use Max and are not recomputed parent ratios.
 | Counter semantics | A blank first rate sample means missing data, not zero. Counter sampling intervals drift; use each row's timestamp. A held-value graph is a display convention, not a claim about exact counter timing. |
 | Typeperf coverage | The counter set is fixed when collection starts, so later process/instance names may be absent. The default paths use English names and may need replacement on localized Windows. |
 | SEP sampling | Sample-derived event counts are estimates, not an exact instruction execution log. Non-precise events may skid; per-sample source-line attribution is deferred. |
-| TMA accuracy | CPU-specific event and metric definitions are required. Multiplexing can bias short intervals and individual functions; results are experimental and not validated as VTune-equivalent. The 100-sample cutoff is not a confidence bound. |
+| TMA accuracy | Intel MPP supplies normalized global metrics and aggregated summaries. Unscheduled/unsupported interval metrics stay unavailable. No process attribution is inferred from system-wide counters. |
 | Symbol coverage | Missing PDBs, JIT code, and ambiguous or missing image metadata can remain unresolved. Unknown samples are retained instead of silently discarded. |
 | Stack collection | LBR uses finite hardware branch history, not an unlimited software stack. User and kernel capture are separate modes. Samples without LBR data may show only the sample IP. |
 | ETW stack fallback | The optional join needs ETW CPU samples with stacks. The default WPR profile collects none, and SEP suppressed ETW CPU sampling on the tested machine. Matching is interval-based, not instruction-exact. |
@@ -287,9 +351,10 @@ to WPA's current UI selection would require additional integration.
 The WPA plugin targets `net6.0` and Microsoft Performance SDK
 `1.2.2-preview`, matching WPA 11.7.383's bundled runtime/SDK. Its SDK reference
 excludes runtime assets so WPA supplies the only SDK copy. `stage-plugins.ps1`
-stages `WpaFusion.Plugin.Sep` and its shared dependencies. SEP EDP files are
-read from the local SEP installation at analysis time; no metric data or
-overview profile is bundled. Typeperf is implemented but not staged.
+stages `WpaFusion.Plugin.Sep` and its shared dependencies, including the EMON
+processing source. MPP and SEP/EMON must be installed separately on the
+capture/processing systems. Once processed, the EMON source reads only the
+copied CSVs, descriptor, and manifest. No overview profile is bundled.
 
 The collector is separately packaged as a self-contained `win-x64` application
 for .NET 10. The package does not include Intel SEP, WPR, Typeperf, or the WPA

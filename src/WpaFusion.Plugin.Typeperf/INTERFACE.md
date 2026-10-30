@@ -23,3 +23,18 @@ When enabled, the view has one row per (timestamp, counter instance) with machin
 ## Public API
 
 `TypeperfData` (`Load`, `Merge`, `RowTimeNs`, `RowDurationNs`, `SampleIntervalNs`, `RowCounter`, `RowValue`) and `TypeperfCounterTable.TableDescriptor`.
+
+## CSV parsing example
+
+```csharp
+using WpaFusion.Plugin.Typeperf.Parsing;
+
+var csv = TypePerfCsv.Load(@".\fixtures\smoke\typeperf.csv");
+Console.WriteLine($"{csv.Counters.Count} counters, {csv.SampleTimesUtc.Count} timestamps");
+var firstUtc = DateTime.FromFileTimeUtc(csv.SampleTimesUtc[0]);
+```
+
+This parses the CSV; it does not enable a WPA table. Without `session.json`,
+wall-clock parsing alone is not a verified ETL alignment. Capture options
+`--counters <file>`, `--interval <seconds>`, and `--no-typeperf` do not change
+the processing source's currently disabled staging status.

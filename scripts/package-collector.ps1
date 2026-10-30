@@ -30,7 +30,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Copy-Item (Join-Path $root "src\WpaFusion.Capture\PACKAGE-README.txt") (Join-Path $package "README.txt")
-Compress-Archive -LiteralPath $package -DestinationPath $archive -CompressionLevel Optimal
 
 New-Item -ItemType Directory -Path $attributePackage -Force | Out-Null
 $attributeProject = Join-Path $root "src\WpaFusion.Attribution\WpaFusion.Attribution.csproj"
@@ -49,6 +48,8 @@ if (@($files | Where-Object Extension -eq ".exe").Count -ne 1 -or
 }
 
 Copy-Item (Join-Path $root "src\WpaFusion.Attribution\PACKAGE-README.txt") (Join-Path $attributePackage "README.txt")
+Copy-Item (Join-Path $attributePackage "wpafusion-attribute.exe") (Join-Path $package "wpafusion-attribute.exe")
+Compress-Archive -LiteralPath $package -DestinationPath $archive -CompressionLevel Optimal
 Compress-Archive -LiteralPath $attributePackage -DestinationPath $attributeArchive -CompressionLevel Optimal
 
 foreach ($path in @($archive, $attributeArchive)) {

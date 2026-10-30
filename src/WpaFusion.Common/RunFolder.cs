@@ -3,7 +3,7 @@ using System.Globalization;
 namespace WpaFusion.Common;
 
 /// <summary>
-/// Creates the per-run artifact folder output/&lt;yyyyMMdd-HHmmss&gt;/ (see DECISIONS.md).
+/// Creates the per-run artifact folder output/&lt;yyyyMMdd-HHmmss&gt;/.
 /// A run never reuses an existing folder.
 /// </summary>
 public static class RunFolder

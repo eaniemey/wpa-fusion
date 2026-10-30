@@ -19,8 +19,9 @@ internal sealed class CaptureOptions
         Collection stops when the workload exits, after --duration, or when you press Enter.
 
         Options:
-          --duration <seconds>   Stop after this many seconds.
+          --duration <seconds>   Stop all collectors after this many seconds; use --sep-duration for a SEP-only window.
           --output <dir>         Output root; each run gets <dir>/<yyyyMMdd-HHmmss>/ (default: <repo>/output).
+          --skip-attribute       Keep raw capture only; do not automatically run wpafusion-attribute afterward.
           --wpr-profile <name>   WPR profile to record, repeatable (default: WpaFusionPrecise, context
                                  switches only for CPU Usage (Precise); GeneralProfile adds CPU Usage (Sampled)).
                                  "none" records only the WPA-Fusion sync markers.
@@ -30,6 +31,8 @@ internal sealed class CaptureOptions
           --sep-events <list>    SEP event list passed to -ec instead of an analysis type; include
                                  CPU_CLK_UNHALTED.REF_TSC for estimated CPU usage.
           --sep-start-paused     Start SEP paused; press Enter when the workload reaches the desired point to resume.
+          --sep-resume-after <seconds> Automatically resume paused SEP after this workload delay instead of Enter.
+          --sep-duration <seconds> Stop only SEP after this resumed window; ETW/Typeperf continue until workload exit.
           --sep-sampling-delay <seconds> Delay sampling after SEP starts or is resumed (default: 0).
           --sep-lbr <mode|off>   SEP last-branch records for call stacks (default: call_stack:usr).
                                  Use "off" to disable. LBR makes .tb7 files large; use -sam to thin samples.
@@ -38,6 +41,11 @@ internal sealed class CaptureOptions
           --no-etw               Skip WPR.
           --no-typeperf          Skip typeperf.
           --no-sep               Skip SEP.
+          --emon                 Collect EMON EDP counters instead of SEP samples (mutually exclusive).
+          --emon-events <file>   EMON EDP event file override; copied into the run for reproducibility.
+          --runs <1|2>           Opt-in pair: SEP+ETL followed by standalone EMON (default: 1 run).
+                                 Requires a workload and ETW; no global --duration. Timed SEP windows are supported. {run-directory}
+                                 in workload arguments expands to each execution's output folder.
           -h, --help             Show this help.
         """;
 
@@ -46,6 +54,7 @@ internal sealed class CaptureOptions
 
     /// <summary>Optional output root. A fresh timestamped run folder is created beneath it.</summary>
     public string? OutputRoot { get; private set; }
+    public bool SkipAttribute { get; private set; }
 
     /// <summary>WPR profile names to start; an empty command-line list receives the precise default profile.</summary>
     public List<string> WprProfiles { get; } = new();
@@ -64,6 +73,8 @@ internal sealed class CaptureOptions
 
     /// <summary>Starts SEP paused and waits for the user to resume it after the workload begins.</summary>
     public bool SepStartPaused { get; private set; }
+    public double? SepResumeAfterSeconds { get; private set; }
+    public double? SepDurationSeconds { get; private set; }
 
     /// <summary>SEP sampling delay in seconds; SEP begins collecting after this delay.</summary>
     public double SepSamplingDelaySeconds { get; private set; }
@@ -85,6 +96,27 @@ internal sealed class CaptureOptions
 
     /// <summary>Whether Intel SEP collection is enabled.</summary>
     public bool Sep { get; private set; } = true;
+
+    public bool Emon { get; private set; }
+    public string? EmonEventsFile { get; private set; }
+    public int RunCount { get; private set; } = 1;
+
+    internal CaptureOptions ForBatchRun(bool emon, string outputRoot)
+    {
+        var copy = (CaptureOptions)MemberwiseClone();
+        copy.RunCount = 1;
+        copy.SkipAttribute = true;
+        copy.OutputRoot = outputRoot;
+        copy.Emon = emon;
+        copy.Sep = !emon;
+        copy.Etw = !emon;
+        copy.EmonEventsFile = emon ? EmonEventsFile : null;
+        copy.SepStartPaused = !emon && SepStartPaused;
+        copy.SepResumeAfterSeconds = emon ? null : SepResumeAfterSeconds;
+        copy.SepDurationSeconds = emon ? null : SepDurationSeconds;
+        copy.SepSamplingDelaySeconds = emon ? 0 : SepSamplingDelaySeconds;
+        return copy;
+    }
 
     /// <summary>Whether help was requested.</summary>
     public bool Help { get; private set; }
@@ -129,6 +161,9 @@ internal sealed class CaptureOptions
                 case "--output":
                     o.OutputRoot = Path.GetFullPath(Value());
                     break;
+                case "--skip-attribute":
+                    o.SkipAttribute = true;
+                    break;
                 case "--wpr-profile":
                     o.WprProfiles.Add(Value());
                     break;
@@ -146,6 +181,22 @@ internal sealed class CaptureOptions
                     break;
                 case "--sep-start-paused":
                     o.SepStartPaused = true;
+                    break;
+                case "--sep-resume-after":
+                    o.SepResumeAfterSeconds = PositiveDouble(a, Value());
+                    if (!double.IsFinite(o.SepResumeAfterSeconds.Value) || o.SepResumeAfterSeconds.Value > int.MaxValue / 1000d)
+                    {
+                        throw new ArgumentException("--sep-resume-after must be finite and fit the process wait timeout.");
+                    }
+
+                    break;
+                case "--sep-duration":
+                    o.SepDurationSeconds = PositiveDouble(a, Value());
+                    if (!double.IsFinite(o.SepDurationSeconds.Value) || o.SepDurationSeconds.Value > int.MaxValue / 1000d)
+                    {
+                        throw new ArgumentException("--sep-duration must be finite and fit the process wait timeout.");
+                    }
+
                     break;
                 case "--sep-sampling-delay":
                     o.SepSamplingDelaySeconds = PositiveDouble(a, Value());
@@ -169,6 +220,22 @@ internal sealed class CaptureOptions
                 case "--no-sep":
                     o.Sep = false;
                     break;
+                case "--emon":
+                    o.Emon = true;
+                    o.Sep = false;
+                    break;
+                case "--emon-events":
+                    o.EmonEventsFile = Path.GetFullPath(Value());
+                    break;
+                case "--runs":
+                    if (!int.TryParse(Value(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var runs) ||
+                        runs is not (1 or 2))
+                    {
+                        throw new ArgumentException("--runs must be 1 (default single run) or 2 (one SEP/ETL and EMON pair).");
+                    }
+
+                    o.RunCount = runs;
+                    break;
                 default:
                     throw new ArgumentException($"Unknown option '{a}'. Use --help.");
             }
@@ -187,6 +254,32 @@ internal sealed class CaptureOptions
         if (!o.Sep && (o.SepStartPaused || o.SepSamplingDelaySeconds > 0))
         {
             throw new ArgumentException("SEP pause and sampling-delay options require SEP collection; remove --no-sep.");
+        }
+
+        if (o.SepResumeAfterSeconds is not null && (!o.Sep || !o.SepStartPaused))
+        {
+            throw new ArgumentException("--sep-resume-after requires --sep-start-paused and SEP collection.");
+        }
+
+        if (o.SepDurationSeconds is not null && (!o.Sep || !o.Etw || o.Workload.Count == 0 || o.DurationSeconds is not null))
+        {
+            throw new ArgumentException("--sep-duration requires SEP, ETW, and a workload; use it instead of the global --duration cap.");
+        }
+
+        if (o.Sep && !o.Etw && !o.SkipAttribute)
+        {
+            throw new ArgumentException("Automatic SEP attribution requires the matching ETL; remove --no-etw or add --skip-attribute.");
+        }
+
+        if (o.EmonEventsFile is not null && (!(o.Emon || o.RunCount > 1) || !File.Exists(o.EmonEventsFile)))
+        {
+            throw new ArgumentException("--emon-events requires --emon and an existing event file.");
+        }
+
+        if (o.RunCount > 1 && (o.Workload.Count == 0 || !o.Etw || !o.Sep || o.Emon ||
+            o.DurationSeconds is not null || o.SepStartPaused && (o.SepResumeAfterSeconds is null || o.SepDurationSeconds is null)))
+        {
+            throw new ArgumentException("Multi-run capture requires a repeatable workload and ETW, without global duration/collector overrides. A paused SEP pass requires both --sep-resume-after and --sep-duration.");
         }
 
         return o;

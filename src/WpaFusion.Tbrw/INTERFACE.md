@@ -4,7 +4,9 @@ Status: implemented.
 
 ## Responsibility
 
-Read-only P/Invoke wrapper over `SEP_ROOT/bin64/amplxe_tbrw_3.52.dll`. Exposes a streaming sample iterator with raw TSC timestamps.
+Read-only P/Invoke wrapper over the selected `SEP_ROOT/bin64/amplxe_tbrw_*.dll`.
+The original ABI baseline is 3.52; other versions require validation. Exposes
+streaming samples with raw TSC timestamps, not EMON counter intervals.
 
 ## Native functions in scope
 
@@ -33,9 +35,27 @@ Out of scope for now: module and bind enumeration, OS/platform queries, writes, 
 stores the 32-entry ring in hardware order; `LBR_TOS` indexes the newest entry and older ones sit at
 TOS-1, TOS-2 (wrapping), matching sfdump. Valid depth ends at the first all-zero FROM/TO entry. The
 spans are valid only during the callback, and samples without LBR data get empty spans.
-Verified on Cascade Lake only (`fixtures/lbr`).
+The committed reference fixture is Cascade Lake (`fixtures/lbr`). Later
+Sapphire Rapids capture/attribution smoke tests used TBRW 3.62; that is not a
+guarantee for other LBR depths or descriptor layouts.
 
 ## Public API
 
 `TbrwFile` (open, metadata, `ReadSamples`, `ReadLbrSamples`, `HasLbr`), `TbrwEventInfo` (dense `Index` and raw `EventId`),
 `PmuSample`, `PmuSampleHandler`, `LbrSampleHandler`, `TbrwDescriptor`. See the source for the rest.
+
+## Read-only sample example
+
+```csharp
+using WpaFusion.Common;
+using WpaFusion.Tbrw;
+
+TbrwLibrary.Initialize(SepInstall.Bin64);
+using var file = TbrwFile.Open(@".\fixtures\smoke\smoke.tb7");
+long count = 0;
+file.ReadSamples((in PmuSample sample) => count++);
+Console.WriteLine($"{count} samples; {file.Events.Count} event definitions");
+```
+
+This opens a bound fixture without binding or modifying it. Use the session's
+clock map for ETL-relative time; raw sample TSC values are not ETW timestamps.

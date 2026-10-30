@@ -37,6 +37,12 @@ public sealed class TmaNode
     public IReadOnlyDictionary<string, string> ConstantsByAlias { get; }
 
     public string Groups { get; }
+    public string OriginalName { get; internal set; } = string.Empty;
+    public int DefinitionOrder { get; internal set; }
+
+    public bool IsTopDown { get; internal set; } = true;
+
+    public string? FormulaError { get; internal set; }
 
     /// <summary>Names from the root down to this node, e.g. [Backend_Bound, Memory_Bound, L1_Bound].</summary>
     public IReadOnlyList<string> Path
@@ -69,35 +75,36 @@ public sealed class TmaMetricSet
 
     public string Source { get; }
 
+    internal static TmaMetricSet FromProcessedMetrics(IReadOnlyList<TmaNode> nodes, string source) => new(nodes, source);
+
     public int MaxLevel => Nodes.Count == 0 ? 0 : Nodes.Max(n => n.Level);
 
     /// <summary>Loads SEP EDP XML metrics, whose TMA depth is encoded by paired leading dots in each metric name.</summary>
-    public static TmaMetricSet LoadSepEdpXml(string metricsXmlPath)
+    public static TmaMetricSet LoadSepEdpXml(string metricsXmlPath, bool includeAllMetrics = false)
     {
         var doc = XDocument.Load(metricsXmlPath);
         var nodes = new List<TmaNode>();
         var hierarchy = new List<TmaNode>();
         foreach (var metric in doc.Root?.Elements("metric") ?? Enumerable.Empty<XElement>())
         {
-            if (!string.Equals((string?)metric.Element("category"), "TMA", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
+            var category = metric.Element("category")?.Value.Trim() ?? string.Empty;
             var rawName = (string?)metric.Attribute("name") ?? string.Empty;
             const string prefix = "metric_TMA_";
-            if (!rawName.StartsWith(prefix, StringComparison.Ordinal))
+            var isTopDown = string.Equals(category, "TMA", StringComparison.OrdinalIgnoreCase) &&
+                rawName.StartsWith(prefix, StringComparison.Ordinal);
+            if (!includeAllMetrics && !isTopDown)
             {
                 continue;
             }
 
-            var pathName = rawName[prefix.Length..];
-            if (pathName.EndsWith("(%)", StringComparison.Ordinal))
+            var pathName = isTopDown ? rawName[prefix.Length..] :
+                rawName.StartsWith("metric_", StringComparison.Ordinal) ? rawName[7..] : rawName;
+            if (isTopDown && pathName.EndsWith("(%)", StringComparison.Ordinal))
             {
                 pathName = pathName[..^3];
             }
 
-            var dotCount = pathName.TakeWhile(c => c == '.').Count();
+            var dotCount = isTopDown ? pathName.TakeWhile(c => c == '.').Count() : 0;
             if (dotCount % 2 != 0)
             {
                 throw new InvalidDataException($"Metric '{rawName}' in '{metricsXmlPath}' has an invalid hierarchy depth.");
@@ -110,7 +117,7 @@ public sealed class TmaMetricSet
                 throw new InvalidDataException($"Metric '{rawName}' in '{metricsXmlPath}' has no name.");
             }
 
-            while (hierarchy.Count >= level)
+            while (isTopDown && hierarchy.Count > 0 && hierarchy[^1].Level >= level)
             {
                 hierarchy.RemoveAt(hierarchy.Count - 1);
             }
@@ -121,8 +128,7 @@ public sealed class TmaMetricSet
                 throw new InvalidDataException($"Metric '{rawName}' in '{metricsXmlPath}' has no ancestor.");
             }
 
-            level = Math.Min(level, hierarchy.Count + 1);
-            var parent = level == 1 ? null : hierarchy[^1];
+            var parent = !isTopDown || level == 1 ? null : hierarchy[^1];
             var events = metric.Elements("event").ToDictionary(
                 element => (string?)element.Attribute("alias") ?? string.Empty,
                 element => element.Value.Trim(), StringComparer.Ordinal);
@@ -131,19 +137,36 @@ public sealed class TmaMetricSet
                 element => element.Value.Trim(), StringComparer.Ordinal);
             var formulaText = metric.Element("formula")?.Value.Trim() ?? string.Empty;
             Formula formula;
+            string? formulaError = null;
             try
             {
                 formula = Formula.Parse(formulaText);
             }
             catch (FormatException ex)
             {
-                throw new InvalidDataException($"Metric '{rawName}' in '{metricsXmlPath}' has an unparsable formula: {ex.Message}", ex);
+                if (!includeAllMetrics)
+                {
+                    throw new InvalidDataException($"Metric '{rawName}' in '{metricsXmlPath}' has an unparsable formula: {ex.Message}", ex);
+                }
+
+                formula = Formula.Parse("0");
+                formulaError = $"unsupported EDP formula: {ex.Message}";
             }
 
             var node = new TmaNode(name, level, parent?.Name, metric.Element("description")?.Value.Trim() ?? string.Empty,
-                formula, events, constants, "TMA") { Parent = parent };
+                formula, events, constants, category)
+            {
+                Parent = parent,
+                IsTopDown = isTopDown,
+                FormulaError = formulaError,
+                OriginalName = rawName,
+                DefinitionOrder = nodes.Count,
+            };
             nodes.Add(node);
-            hierarchy.Add(node);
+            if (isTopDown)
+            {
+                hierarchy.Add(node);
+            }
         }
 
         if (nodes.Count == 0)

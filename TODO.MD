@@ -1,7 +1,10 @@
 # WPA-Fusion TODO
 
-Prioritized follow-up work from the project review. The current documented
-check (`scripts/check.ps1`) passes: 88 tests, 0 failures.
+Prioritized follow-up work. As of 2026-10-30, the documented check
+(`scripts/check.ps1`) passes 106 tests; run it for current totals. Implemented
+features include opt-in SEP+ETL/EMON fusion, SEP-only windows with complete ETL
+coverage, official MPP metrics, original-order TMA hierarchy restoration, and
+explicit disjoint table ownership. The items below remain outstanding.
 
 ## P1 - Reliability and result confidence
 
@@ -15,11 +18,12 @@ check (`scripts/check.ps1`) passes: 88 tests, 0 failures.
   UTC anchors, and surface marker residuals, missing per-CPU TSC corrections,
   and suspicious clock discontinuities to users. Do not silently present an
   unqualified alignment when calibration is incomplete.
-- [ ] **Reference-validate TMA calculations.** Compare global and attributed
-  metrics against a trusted tool or reference capture across supported PMUs,
-  event sets, SMT configurations, and multiplexing conditions. Verify system
-  constants and group-scaling assumptions; publish accuracy bounds or mark
-  metrics unavailable where the comparison does not support them.
+- [ ] **Expand EMON/MPP and fusion reference validation.** Verify imported
+  interval values, original hierarchy, arithmetic means versus MPP aggregates,
+  and clock alignment across PMUs, event sets, SMT configurations, multiplexing,
+  DST, and MPP versions. Quantify repeatability before using cross-run phase
+  comparisons. Process/module TMA remains intentionally unexposed; the sampled
+  evaluator is legacy experimental code, not the WPA metric source.
 
 ## P2 - Usability and correctness
 
@@ -27,7 +31,8 @@ check (`scripts/check.ps1`) passes: 88 tests, 0 failures.
   finite, representable values for duration, Typeperf interval, SEP delay, and
   marker count; validate integer/range constraints and guard conversions and
   timeout calculations against overflow. Add tests for NaN, infinity, very
-  large values, and fractional marker counts.
+  large values, and fractional marker counts. Timed resume/SEP-only duration
+  already have finite-value and timeout bounds; other numeric paths need review.
 - [ ] **Complete the Typeperf WPA workflow.** Stage the Typeperf processing
   source and pass `typeperf.csv` from `open-run.ps1`, or clearly expose an
   opt-in workflow if it must remain disabled by default. Verify CSV clock

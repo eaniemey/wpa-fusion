@@ -7,6 +7,16 @@ namespace WpaFusion.Tests;
 [Collection(Fixtures.Tb7Collection)]
 public class SepPluginTests
 {
+    [Fact]
+    public void Sep_and_emon_inputs_process_together_with_exclusive_table_owners()
+    {
+        var plugins = EngineHarness.LoadPlugins("WpaFusion.Plugin.Sep");
+        var metrics = EngineHarness.BuildEmonTable(plugins, TmaTimelineTable.TableDescriptor, Fixtures.SmokeTb7);
+        Assert.Equal(4, metrics.RowCount);
+        var samples = EngineHarness.BuildEmonTable(plugins, SepSampleTable.TableDescriptor, Fixtures.SmokeTb7);
+        Assert.Equal(24446, samples.RowCount);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -14,7 +24,8 @@ public class SepPluginTests
     {
         var plugins = EngineHarness.LoadPlugins("WpaFusion.Plugin.Sep");
         var descriptor = tma ? TmaTimelineTable.TableDescriptor : SepSampleTable.TableDescriptor;
-        var table = EngineHarness.BuildTable(plugins, descriptor, Fixtures.SmokeTb7);
+        var table = tma ? EngineHarness.BuildEmonTable(plugins, descriptor) :
+            EngineHarness.BuildTable(plugins, descriptor, Fixtures.SmokeTb7);
 
         Assert.NotEmpty(table.BuiltInTableConfigurations);
         foreach (var configuration in table.BuiltInTableConfigurations)
@@ -23,7 +34,7 @@ public class SepPluginTests
             var separator = columns.IndexOf(TableConfiguration.GraphColumn);
             Assert.True(separator >= 0);
             var metric = Assert.Single(columns.Skip(separator + 1));
-            Assert.Equal(tma ? "% of Slots" : "Event Count", metric.Metadata.Name);
+            Assert.Equal(tma ? "Value" : "Event Count", metric.Metadata.Name);
             var startTime = configuration.ColumnRoles[ColumnRole.StartTime];
             Assert.Contains(columns.Take(separator), column => column.Metadata.Guid == startTime);
         }

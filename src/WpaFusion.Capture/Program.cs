@@ -9,7 +9,32 @@ try
         return 0;
     }
 
-    return new CaptureSession(options).Run();
+    string runDirectory;
+    if (options.RunCount > 1)
+    {
+        var batch = new CaptureBatch(options);
+        batch.Run();
+        runDirectory = batch.RunDirectory!;
+    }
+    else
+    {
+        var session = new CaptureSession(options);
+        session.Run();
+        runDirectory = session.RunDirectory!;
+    }
+
+    Console.WriteLine($"Raw capture: {runDirectory}");
+    if (!options.SkipAttribute && (options.Sep || options.Emon))
+    {
+        await CapturePostProcessor.RunAsync(runDirectory);
+    }
+    else
+    {
+        Console.WriteLine(options.SkipAttribute ? "Automatic attribution skipped (--skip-attribute)." : "No PMU input was collected; attribution is not applicable.");
+        Console.WriteLine($"Output: {runDirectory}");
+    }
+
+    return 0;
 }
 catch (ArgumentException ex)
 {

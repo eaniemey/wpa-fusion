@@ -25,6 +25,8 @@ if (args.Length is < 1 or > 2 || args[0] is "--help" or "-h")
     Console.WriteLine("Usage: wpafusion-attribute <run-directory> [symbol-path] [--stacks etw|lbr|both]");
     Console.WriteLine("--stacks picks the stack sources to write: etw (ETW CPU-sample join), lbr (SEP LBR call stacks, default) or both. etw needs an ETL with CPU sampling taken during the SEP run.");
     Console.WriteLine("Creates a NEW output run with copied inputs and SEP attribution. Never modifies the source.");
+    Console.WriteLine("A standalone EMON run is processed by Intel MPP into a new output dataset; a capture batch is attributed and fused.");
+    Console.WriteLine("A multi-run capture batch produces a fused SEP/EMON dataset aligned at workload start; executions remain separate and explicitly labeled.");
     Console.WriteLine("Supply a local symbol path or an explicitly approved symbol server path for function names.");
     return args.Length == 0 || args.Length > 2 ? 2 : 0;
 }
@@ -32,7 +34,22 @@ if (args.Length is < 1 or > 2 || args[0] is "--help" or "-h")
 try
 {
     var source = Path.GetFullPath(args[0]);
+    if (File.Exists(Path.Combine(source, CaptureBatchManifest.FileName)))
+    {
+        return await FusionPipeline.RunAsync(source, args.Length == 2 ? args[1] : null, stacksMode);
+    }
+
     var manifest = SessionManifest.Load(Path.Combine(source, SessionManifest.FileName));
+    if (manifest.Alignment is not null)
+    {
+        throw new InvalidDataException("Attribution must use a native run and its own ETL before fusion, not an already aligned source copy.");
+    }
+
+    if (manifest.Files.EmonDat is not null && manifest.Files.Tb7 is null)
+    {
+        return await FusionPipeline.ProcessEmonAsync(source);
+    }
+
     string Input(string? name)
     {
         if (string.IsNullOrWhiteSpace(name) || Path.GetFileName(name) != name)

@@ -1,6 +1,7 @@
 using Microsoft.Performance.SDK.Processing;
 using Microsoft.Performance.Toolkit.Engine;
 using Xunit;
+using WpaFusion.Common;
 
 namespace WpaFusion.Tests;
 
@@ -10,6 +11,45 @@ namespace WpaFusion.Tests;
 /// </summary>
 internal static class EngineHarness
 {
+    public static ITableResult BuildEmonTable(PluginSet plugins, TableDescriptor table, params string[] additionalFiles)
+        => WithEmonFixture(path => BuildTable(plugins, table, additionalFiles.Prepend(path).ToArray()));
+
+    public static TResult WithEmonFixture<TResult>(Func<string, TResult> action)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "wpafusion-emon-table-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var zero = new DateTime(2026, 10, 30, 12, 0, 0, DateTimeKind.Utc);
+            new SessionManifest
+            {
+                RunId = "emon-table-test",
+                CaptureTimeZoneId = "UTC",
+                QpcFrequency = 10_000_000,
+                SyncStart = new SyncPoint(1000, 100, zero.ToFileTimeUtc(), 1),
+                SyncEnd = new SyncPoint(2000, 200, zero.AddSeconds(3).ToFileTimeUtc(), 1),
+                Etl = new EtlClockReference(100, zero.ToFileTimeUtc()),
+            }.Save(Path.Combine(directory, SessionManifest.FileName));
+            File.WriteAllText(Path.Combine(directory, "summary.csv"), """
+                name,aggregated,description
+                metric_CPI,2,Cycles per instruction
+                metric_TMA_Retiring(%),50,Retiring
+                """);
+            File.WriteAllText(Path.Combine(directory, "details.csv"), """
+                #sample,timestamp,metric_CPI,metric_TMA_Retiring(%),$samplingTime
+                1,2026-10-30T12:00:01,1,40,1
+                2,2026-10-30T12:00:02,3,60,1
+                """);
+            var path = Path.Combine(directory, "metrics.emon.json");
+            File.WriteAllText(path, """{"schemaVersion":1,"details":"details.csv","summary":"summary.csv"}""");
+            return action(path);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     public static string PluginDir(string project) =>
         Path.Combine(Fixtures.RepoRoot(), "src", project, "bin",
 #if DEBUG

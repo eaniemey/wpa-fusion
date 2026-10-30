@@ -26,6 +26,147 @@ public class CapturePreciseProfileTests
     {
         var options = CaptureOptions.Parse(new[] { "--duration", "1" });
         Assert.Equal(new[] { WprCollector.PreciseProfileName }, options.WprProfiles);
+        Assert.Equal(1, options.RunCount);
+        Assert.False(options.SkipAttribute);
+        Assert.Null(options.SepResumeAfterSeconds);
+    }
+
+    [Fact]
+    public void Automatic_attribution_is_default_and_raw_capture_is_an_explicit_opt_out()
+    {
+        Assert.False(CaptureOptions.Parse(Array.Empty<string>()).SkipAttribute);
+        Assert.True(CaptureOptions.Parse(new[] { "--skip-attribute" }).SkipAttribute);
+        Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--no-etw" }));
+        Assert.True(CaptureOptions.Parse(new[] { "--no-etw", "--skip-attribute" }).SkipAttribute);
+        var batch = CaptureOptions.Parse(new[] { "--runs", "2", "--", "repeatable.exe" });
+        Assert.False(batch.SkipAttribute);
+        Assert.True(batch.ForBatchRun(false, "sep").SkipAttribute);
+        Assert.True(batch.ForBatchRun(true, "emon").SkipAttribute);
+    }
+
+    [Fact]
+    public void Attribution_executable_selection_and_arguments_support_portable_capture()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "wpafusion-auto-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var sibling = Path.Combine(directory, "wpafusion-attribute.exe");
+            File.WriteAllText(sibling, "test executable path only");
+            Assert.Equal(sibling, CapturePostProcessor.FindExecutable(directory, directory, null));
+            Assert.Equal(sibling, CapturePostProcessor.FindExecutable(directory, directory, $"\"{sibling}\""));
+            Assert.Throws<FileNotFoundException>(() => CapturePostProcessor.FindExecutable(directory, directory, Path.Combine(directory, "missing.exe")));
+            var start = CapturePostProcessor.CreateStartInfo(sibling, Path.Combine(directory, "run with spaces"));
+            Assert.False(start.UseShellExecute);
+            Assert.Equal(Path.Combine(directory, "run with spaces"), Assert.Single(start.ArgumentList));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Attribution_failure_preserves_raw_data_and_does_not_mark_capture_failed()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "wpafusion-post-failure-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var raw = Path.Combine(directory, "raw-data.txt");
+            File.WriteAllText(raw, "preserve this capture");
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => CapturePostProcessor.RunAsync(directory));
+            Assert.Contains("Capture completed successfully", error.Message);
+            Assert.Equal("preserve this capture", File.ReadAllText(raw));
+            Assert.True(File.Exists(Path.Combine(directory, "ATTRIBUTION-FAILED.txt")));
+            Assert.False(File.Exists(Path.Combine(directory, "CAPTURE-FAILED.txt")));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Timed_sep_resume_is_opt_in_and_requires_start_paused()
+    {
+        var options = CaptureOptions.Parse(new[] { "--sep-start-paused", "--sep-resume-after", "30", "--duration", "5" });
+        Assert.Equal(30, options.SepResumeAfterSeconds);
+        Assert.Equal(5, options.DurationSeconds);
+        Assert.Contains(" -sp ", SepCollector.BuildCommandLine(options, "run"));
+        Assert.DoesNotContain(" -sd ", SepCollector.BuildCommandLine(options, "run"));
+        Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--sep-resume-after", "30" }));
+        Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--sep-start-paused", "--sep-resume-after", "Infinity" }));
+    }
+
+    [Fact]
+    public void Sep_only_duration_preserves_full_workload_capture_and_is_valid_for_opt_in_batch()
+    {
+        var options = CaptureOptions.Parse(new[] { "--runs", "2", "--sep-start-paused", "--sep-resume-after", "30",
+            "--sep-duration", "5", "--", "repeatable.exe" });
+        Assert.Null(options.DurationSeconds);
+        var sep = options.ForBatchRun(false, "sep-output");
+        Assert.True(sep.Etw);
+        Assert.True(sep.SepStartPaused);
+        Assert.Equal(30, sep.SepResumeAfterSeconds);
+        Assert.Equal(5, sep.SepDurationSeconds);
+        var emon = options.ForBatchRun(true, "emon-output");
+        Assert.False(emon.SepStartPaused);
+        Assert.Null(emon.SepResumeAfterSeconds);
+        Assert.Null(emon.SepDurationSeconds);
+        Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--sep-duration", "5" }));
+        Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--sep-duration", "5", "--duration", "5", "--", "repeatable.exe" }));
+        Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--sep-duration", "5", "--no-etw", "--", "repeatable.exe" }));
+    }
+
+    [Fact]
+    public void Multi_run_is_explicit_and_requires_completed_repeatable_workloads()
+    {
+        var options = CaptureOptions.Parse(new[] { "--runs", "2", "--", "repeatable.exe" });
+        Assert.Equal(2, options.RunCount);
+        Assert.True(options.ForBatchRun(false, "sep-output").Sep);
+        Assert.True(options.ForBatchRun(false, "sep-output").Etw);
+        Assert.False(options.ForBatchRun(false, "sep-output").Emon);
+        Assert.True(options.ForBatchRun(true, "emon-output").Emon);
+        Assert.False(options.ForBatchRun(true, "emon-output").Sep);
+        Assert.False(options.ForBatchRun(true, "emon-output").Etw);
+        Assert.Equal(1, options.ForBatchRun(true, "emon-output").RunCount);
+        Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--runs", "2" }));
+        Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--runs", "3", "--", "repeatable.exe" }));
+        Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--runs", "4", "--", "repeatable.exe" }));
+        Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--runs", "2", "--duration", "1", "--", "repeatable.exe" }));
+        Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--runs", "2", "--emon", "--", "repeatable.exe" }));
+    }
+
+    [Fact]
+    public void Emon_mode_replaces_sep_but_keeps_etw_and_typeperf()
+    {
+        var options = CaptureOptions.Parse(new[] { "--emon" });
+        Assert.True(options.Emon);
+        Assert.False(options.Sep);
+        Assert.True(options.Etw);
+        Assert.True(options.Typeperf);
+        Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--emon", "--sep-start-paused" }));
+        Assert.False(CaptureOptions.Parse(new[] { "--emon", "--no-etw" }).Etw);
+    }
+
+    [Fact]
+    public void Emon_event_override_uses_a_run_local_snapshot()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            var options = CaptureOptions.Parse(new[] { "--emon", "--emon-events", path });
+            var command = EmonCollector.BuildCommandLine(options, "run folder");
+            Assert.Contains("-collect-edp", command);
+            Assert.Contains("\"edp_file=" + Path.Combine("run folder", EmonCollector.EventsFileName) + "\"", command);
+            Assert.DoesNotContain(path, command);
+            Assert.Throws<ArgumentException>(() => CaptureOptions.Parse(new[] { "--emon-events", path }));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]

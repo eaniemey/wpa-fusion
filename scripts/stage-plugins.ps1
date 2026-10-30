@@ -1,11 +1,12 @@
 <#
 .SYNOPSIS
-    Builds and stages the WPA-Fusion SEP plugin.
+    Builds and stages WPA-Fusion's SEP and EMON processing sources.
 .DESCRIPTION
-    Output: artifacts\plugins\WPA-Fusion\ (WpaFusion.Plugin.Sep.dll and shared libraries; TMA metrics come
-    from the local SEP install's config\edp). The Typeperf processing source is excluded for now; capture still writes its CSV. Load it with:
+    Output: artifacts\plugins\WPA-Fusion\ (WpaFusion.Plugin.Sep.dll and shared libraries).
+    SEP owns sample/stack tables; EMON imports processed Intel MPP CSV metrics and XML hierarchy snapshots.
+    The Typeperf source, MPP, metric databases, and overview profiles are not bundled. Load it with:
         wpa.exe -addsearchdir <repo>\artifacts\plugins\WPA-Fusion
-    Staging keeps WPA from locking the build output.
+    Close WPA before restaging. Staging keeps WPA from locking the build output.
 .PARAMETER Configuration
     Debug or Release (default Release).
 #>

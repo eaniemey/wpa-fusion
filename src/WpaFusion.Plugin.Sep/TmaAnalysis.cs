@@ -32,7 +32,25 @@ public sealed class TmaAnalysis
 
     public bool IsAvailable => Metrics is not null;
 
+    public static TmaAnalysis Unavailable(string reason) => new(reason);
+
+    public static TmaAnalysis FromEmon(EmonMetricData data) => new("Intel MPP metrics from EMON EDP counters; no SEP sample estimation")
+    {
+        Metrics = data.Metrics,
+        Summary = new TmaWindow(data.FirstNs, data.LastNs - data.FirstNs, data.Intervals.Count, data.Averages),
+        MetricAverages = data.Averages,
+        MppAggregates = data.Summary,
+        ValidIntervalCounts = data.ValidIntervalCounts,
+        SourceRun = data.Provenance,
+        Slices = data.Intervals.Select(interval => new TmaWindow(interval.StartNs, interval.DurationNs, 1, interval.Results)).ToArray(),
+    };
+
     public TmaMetricSet? Metrics { get; private set; }
+    public string SourceRun { get; private set; } = string.Empty;
+
+    public IReadOnlyList<TmaResult> MetricAverages { get; private set; } = Array.Empty<TmaResult>();
+    public IReadOnlyList<TmaResult> MppAggregates { get; private set; } = Array.Empty<TmaResult>();
+    public IReadOnlyList<long> ValidIntervalCounts { get; private set; } = Array.Empty<long>();
 
     public MultiplexScales? Scales { get; private set; }
 
@@ -59,25 +77,11 @@ public sealed class TmaAnalysis
     }
 
     /// <summary>
-    /// Evaluates the SEP EDP metrics of the platform the run was collected on: the platform in session.json,
-    /// else the local SEP's platform for the .tb7's CPUID signature.
+    /// SEP samples are not a supported TMA source; use FromEmon for official MPP results.
     /// </summary>
     public static TmaAnalysis Compute(SepData data, long sliceNs)
     {
-        var sepRoot = SepInstall.Root;
-        var platform = SepPlatform.Resolve(data.Manifest, data.System.CpuIdSignature);
-        if (platform is null)
-        {
-            return new TmaAnalysis($"TMA unavailable: the SEP install at {sepRoot} does not know this CPU (CPUID 0x{data.System.CpuIdSignature:X}).");
-        }
-
-        var edp = platform.EdpMetricsPath(sepRoot);
-        if (edp is null)
-        {
-            return new TmaAnalysis($"TMA unavailable: no SEP EDP metric file for PMU '{platform.Pmu}' under {Path.Combine(sepRoot, "config", "edp")}.");
-        }
-
-        return Compute(data, TmaMetricSet.LoadSepEdpXml(edp), $"SEP EDP ({Path.GetFileName(edp)}) for {platform.CpuName}", sliceNs);
+        return Unavailable("TMA requires an EMON EDP capture processed by Intel MPP. SEP provides samples and stacks only.");
     }
 
     /// <summary>Evaluates <paramref name="metrics"/> over the run; <paramref name="metricSource"/> is reported in <see cref="Status"/>.</summary>

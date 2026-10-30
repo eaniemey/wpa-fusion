@@ -31,10 +31,7 @@ public sealed class EventCounts
 /// <summary>Values for the system constants used by TMA formulas.</summary>
 public sealed class TmaConstants
 {
-    /// <summary>
-    /// Hyper-threading flag fed to formulas (smt_on). WPA-Fusion evaluates per thread, as VTune does
-    /// with the uarch-exploration event set, so this defaults to false (see DECISIONS.md).
-    /// </summary>
+    /// <summary>Legacy sampled evaluator's per-thread SMT flag; not used by EMON/MPP views.</summary>
     public bool HyperThreadingOn { get; init; }
 
     public int ThreadsPerCore { get; init; } = 1;
@@ -136,9 +133,18 @@ public static class TmaEvaluator
         var results = new List<TmaResult>(set.Nodes.Count);
         foreach (var node in set.Nodes)
         {
+            if (node.FormulaError is { } formulaError)
+            {
+                results.Add(new TmaResult(node, double.NaN, new[] { formulaError }));
+                continue;
+            }
+
             try
             {
-                results.Add(new TmaResult(node, Evaluate(node, counts, constants), Array.Empty<string>()));
+                var value = Evaluate(node, counts, constants);
+                results.Add(new TmaResult(node, value, double.IsFinite(value)
+                    ? Array.Empty<string>()
+                    : new[] { "insufficient sampled inputs or zero denominator" }));
             }
             catch (MissingTmaInputException ex)
             {

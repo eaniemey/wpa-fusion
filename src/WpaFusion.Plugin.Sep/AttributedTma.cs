@@ -68,7 +68,7 @@ public static class AttributedTma
             var sampleCount = samples.Values.Sum();
             var start = summary ? data.FirstNs : data.FirstNs + bucket.Slice * sliceNs;
             var duration = Math.Max(1, summary ? data.LastNs - start : Math.Min(sliceNs, data.LastNs - start));
-            var evaluated = TmaEvaluator.EvaluateAll(metrics, counts, constants).Select(result =>
+            var evaluated = TmaEvaluator.EvaluateAll(metrics, counts, constants).Where(result => result.Node.IsTopDown).Select(result =>
             {
                 if (bucket.Key.Scope != "Process" &&
                     (bucket.Key.Module.StartsWith("[", StringComparison.Ordinal) ||

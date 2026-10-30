@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace WpaFusion.Common;
 
-/// <summary>Locates the pinned SEP install (see DECISIONS.md).</summary>
+/// <summary>Locates SEP via configuration, the baseline path, or install discovery.</summary>
 public static class SepInstall
 {
     public const string EnvironmentVariable = "WPA_FUSION_SEP_ROOT";
